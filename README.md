@@ -16,6 +16,7 @@
 
 ## 相关文档
 
+
 - [Google-MediaPipe-zh-python-setup](https://ai.google.dev/edge/mediapipe/solutions/setup_python?hl=zh-cn)
 
 - [Google-MediaPipe-zh-user-guide](https://ai.google.dev/edge/mediapipe/solutions/guide?hl=zh-cn#get_started)
@@ -24,3 +25,15 @@
         - 首先下载 VS 工具集，然后安装重启
         - 之后回到虚拟环境安装 `pip install msvc-runtime`
         - [VS 工具集下载链接](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170)
+
+
+使用方式总结
+```shell
+conda create -n gestureDR python=3.10 
+
+conda activate gestureDR
+
+pip install mediapipe opencv-python
+
+pip install msvc-runtime
+```
