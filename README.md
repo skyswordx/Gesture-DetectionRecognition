@@ -6,19 +6,23 @@
 
 第一级（手部检测）：
 - 目标：快速找到图像中手的位置，并框出边界框（Bounding Box）
-- 输出：手的坐标范围（例如左上角坐标(x1,y1)和右下角坐标(x2,y2)）
-- 方案：[google-media-pipe](https://github.com/google-ai-edge/mediapipe)
+- 输出：手的坐标范围设置 ROI 区域（例如左上角坐标(x1,y1)和右下角坐标(x2,y2)）
 
-第二级（关键点+分类）：
-- 目标：在检测到的区域中定位手部关键点（如21个关节位置），然后根据关键点判断手势类型
+第二级（超分修复放大）
+- 放大的模型选择
+	- 曾经有段时间，`LSDR` 被认为是最好的
+	- 有些人喜欢 `swinir`，有些喜欢 `esrgan4x`、`ymmv`
+	- 推荐使用 `ESRGAN_4x`
+	- 如果要搞二次元，推荐使用 [Real-CUGAN](https://github.com/bilibili/ailab/tree/main/Real-CUGAN)
+
+第三级（关键点+分类）：
+- 目标：在放大修复后的 ROI 区域中定位手部关键点（如21个关节位置），然后根据关键点判断手势类型
 - 输出：关键点坐标 + 手势类别（如“握拳”“比耶”等）
-- 方案： SVM
+- 方案：[google-media-pipe](https://github.com/google-ai-edge/mediapipe)
 
 ## 相关文档
 
-
 - [Google-MediaPipe-zh-python-setup](https://ai.google.dev/edge/mediapipe/solutions/setup_python?hl=zh-cn)
-
 - [Google-MediaPipe-zh-user-guide](https://ai.google.dev/edge/mediapipe/solutions/guide?hl=zh-cn#get_started)
 
     - [配置环境需要 VS 工具集](https://github.com/google-ai-edge/mediapipe/issues/1905)
