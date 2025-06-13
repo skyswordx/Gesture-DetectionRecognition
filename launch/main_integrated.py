@@ -508,8 +508,7 @@ class GestureControlSystem:
         print(f"运行时间: {elapsed:.1f}s")
         print(f"处理帧数: {self.frame_count}")
         print(f"平均FPS: {avg_fps:.1f}")
-        
-        # 各模块统计
+          # 各模块统计
         try:
             print("\n姿势检测模块状态: 运行正常")
             print("距离估算模块状态: 运行正常")
@@ -532,6 +531,7 @@ class GestureControlSystem:
         except:
             pass
         print("统计信息已重置")
+
 
 class IntegratedGestureGUI:
     """整合的手势控制GUI系统"""
@@ -581,13 +581,14 @@ class IntegratedGestureGUI:
         # 线程管理
         self.process_thread = None
         self.frame_queue = queue.Queue(maxsize=5)
-        self.result_queue = queue.Queue(maxsize=10)
-        
-        # 创建GUI界面
+        self.result_queue = queue.Queue(maxsize=10)        # 创建GUI界面
         self.create_gui()
         
         # 初始化系统组件
         self.init_system_components()
+        
+        # 自动刷新摄像头列表
+        self.refresh_camera_list()
     
     def init_system_components(self):
         """初始化系统组件"""
@@ -635,6 +636,29 @@ class IntegratedGestureGUI:
         # 控制面板框架
         control_frame = ttk.LabelFrame(parent, text="控制面板", padding=10)
         control_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
+        
+        # 摄像头选择
+        camera_frame = ttk.LabelFrame(control_frame, text="摄像头设置", padding=10)
+        camera_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # 摄像头选择下拉框
+        ttk.Label(camera_frame, text="选择摄像头:").pack(anchor=tk.W)
+        self.camera_var = tk.StringVar()
+        self.camera_combo = ttk.Combobox(camera_frame, textvariable=self.camera_var, 
+                                        state="readonly", width=25)
+        self.camera_combo.pack(fill=tk.X, pady=2)
+        
+        # 刷新摄像头列表按钮
+        ttk.Button(camera_frame, text="刷新摄像头列表", 
+                  command=self.refresh_camera_list).pack(fill=tk.X, pady=2)
+        
+        # 分辨率选择
+        ttk.Label(camera_frame, text="分辨率:").pack(anchor=tk.W, pady=(5, 0))
+        self.resolution_var = tk.StringVar(value="640x480")
+        resolution_combo = ttk.Combobox(camera_frame, textvariable=self.resolution_var,
+                                       values=["320x240", "640x480", "800x600", "1024x768", "1280x720"],
+                                       state="readonly", width=25)
+        resolution_combo.pack(fill=tk.X, pady=2)
         
         # 系统控制
         system_frame = ttk.LabelFrame(control_frame, text="系统控制", padding=10)
@@ -762,16 +786,21 @@ class IntegratedGestureGUI:
         
         # 帧计数器
         self.frame_counter_var = tk.StringVar(value="帧数: 0")
-        ttk.Label(status_frame, textvariable=self.frame_counter_var, 
-                 relief=tk.SUNKEN).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Label(status_frame, textvariable=self.frame_counter_var,                 relief=tk.SUNKEN).pack(side=tk.RIGHT, padx=(5, 0))
     
     def start_system(self):
         """启动系统"""
         try:
+            # 获取选择的摄像头和分辨率
+            camera_id = self.get_selected_camera_id()
+            width, height = self.get_selected_resolution()
+            
+            self.log_message(f"🎥 正在启动摄像头 {camera_id}, 分辨率: {width}x{height}")
+            
             # 初始化摄像头
-            self.camera_capture = CameraCapture(camera_id=0, width=640, height=480)
+            self.camera_capture = CameraCapture(camera_id=camera_id, width=width, height=height)
             if not self.camera_capture.start():
-                raise Exception("摄像头启动失败")
+                raise Exception(f"摄像头 {camera_id} 启动失败")
             
             self.is_running = True
             self.is_paused = False
@@ -789,9 +818,11 @@ class IntegratedGestureGUI:
             self.start_button.config(state=tk.DISABLED)
             self.stop_button.config(state=tk.NORMAL)
             self.pause_button.config(state=tk.NORMAL)
+              # 禁用摄像头选择，防止运行时更改
+            self.camera_combo.config(state=tk.DISABLED)
             
             self.status_var.set("系统运行中...")
-            self.log_message("✅ 系统启动成功")
+            self.log_message(f"✅ 系统启动成功 - 摄像头 {camera_id} ({width}x{height})")
             
         except Exception as e:
             error_msg = f"系统启动失败: {e}"
@@ -812,6 +843,9 @@ class IntegratedGestureGUI:
         self.start_button.config(state=tk.NORMAL)
         self.stop_button.config(state=tk.DISABLED)
         self.pause_button.config(state=tk.DISABLED)
+        
+        # 重新启用摄像头选择
+        self.camera_combo.config(state="readonly")
         
         # 清空画布
         self.video_canvas.delete("all")
@@ -1184,33 +1218,118 @@ class IntegratedGestureGUI:
         self.log_message("🚀 GUI系统已启动")
         self.log_message("💡 点击'启动摄像头'开始检测")
         self.root.mainloop()
+    
+    def refresh_camera_list(self):
+        """刷新摄像头列表"""
+        try:
+            self.log_message("🔍 正在检测可用摄像头...")
+            available_cameras = self.detect_available_cameras()
+            
+            # 更新下拉框选项
+            camera_options = []
+            for camera_info in available_cameras:
+                camera_options.append(f"摄像头 {camera_info['id']}: {camera_info['name']}")
+            
+            if camera_options:
+                self.camera_combo['values'] = camera_options
+                self.camera_combo.current(0)  # 默认选择第一个
+                self.log_message(f"✅ 检测到 {len(camera_options)} 个摄像头")
+            else:
+                self.camera_combo['values'] = ["未检测到摄像头"]
+                self.log_message("⚠️ 未检测到可用摄像头")
+                
+        except Exception as e:
+            self.log_message(f"❌ 检测摄像头失败: {e}")
+            logger.error(f"检测摄像头失败: {e}")
+    
+    def detect_available_cameras(self):
+        """检测可用的摄像头"""
+        available_cameras = []
+        
+        # 测试摄像头ID 0-4
+        for camera_id in range(5):
+            try:
+                cap = cv2.VideoCapture(camera_id)
+                if cap.isOpened():
+                    ret, frame = cap.read()
+                    if ret and frame is not None:
+                        # 获取摄像头信息
+                        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                        fps = int(cap.get(cv2.CAP_PROP_FPS))
+                        
+                        camera_info = {
+                            'id': camera_id,
+                            'name': f"{width}x{height}@{fps}fps",
+                            'width': width,
+                            'height': height,
+                            'fps': fps
+                        }
+                        available_cameras.append(camera_info)
+                        
+                cap.release()
+            except Exception:
+                continue
+        
+        return available_cameras
+    
+    def get_selected_camera_id(self):
+        """获取选中的摄像头ID"""
+        try:
+            if self.camera_var.get():
+                # 从选项中提取摄像头ID (格式: "摄像头 0: 640x480@30fps")
+                selected_text = self.camera_var.get()
+                if "摄像头" in selected_text and ":" in selected_text:
+                    camera_id_str = selected_text.split("摄像头")[1].split(":")[0].strip()
+                    return int(camera_id_str)
+            return 0
+        except Exception as e:
+            logger.error(f"解析摄像头ID失败: {e}")
+            return 0
+    
+    def get_selected_resolution(self):
+        """获取选中的分辨率"""
+        try:
+            resolution_str = self.resolution_var.get()
+            if "x" in resolution_str:
+                width_str, height_str = resolution_str.split("x")
+                return int(width_str), int(height_str)
+            return 640, 480
+        except Exception as e:
+            logger.error(f"解析分辨率失败: {e}")
+            return 640, 480
 
 def show_mode_selection():
     """显示模式选择对话框"""
     try:
+        import tkinter as tk
+        from tkinter import messagebox
+        
         root = tk.Tk()
         root.withdraw()  # 隐藏主窗口
         
-        choice = messagebox.askyesnocancel(
+        # 创建选择对话框
+        result = messagebox.askyesnocancel(
             "启动模式选择",
-            "请选择启动模式:\n\n"
-            "是 - GUI图形界面模式\n"
-            "否 - 控制台模式\n"
-            "取消 - 退出程序"
+            "请选择启动模式:\n\n是 - GUI模式 (图形界面)\n否 - 控制台模式\n取消 - 退出程序"
         )
         
         root.destroy()
         
-        if choice is None:  # 取消
-            return "exit"
-        elif choice:  # 是
+        if result is True:
             return "gui"
-        else:  # 否
+        elif result is False:
             return "console"
-    
+        else:
+            return "exit"
+            
+    except ImportError:
+        # 如果tkinter不可用，默认使用控制台模式
+        print("tkinter不可用，将使用控制台模式")
+        return "console"
     except Exception as e:
-        logger.error(f"模式选择对话框错误: {e}")
-        return "console"  # 默认控制台模式
+        print(f"模式选择失败: {e}, 使用控制台模式")
+        return "console"
 
 def start_gui_mode():
     """启动GUI模式"""
@@ -1318,6 +1437,7 @@ def check_system_requirements():
     print("检查系统需求...")
     
     issues = []
+    warnings = []
     
     # 检查Python版本
     if sys.version_info < (3, 7):
@@ -1337,25 +1457,32 @@ def check_system_requirements():
         except ImportError:
             issues.append(f"缺少必要包: {install_name}")
     
-    # 检查摄像头
+    # 检查摄像头 (仅警告，不阻止启动)
     try:
+        import cv2
         cap = cv2.VideoCapture(0)
         if not cap.isOpened():
-            issues.append("无法访问摄像头 (ID: 0)")
+            warnings.append("无法访问摄像头 (ID: 0) - 可在GUI中选择其他摄像头")
         else:
             cap.release()
     except Exception as e:
-        issues.append(f"摄像头检查失败: {e}")
+        warnings.append(f"摄像头检查失败: {e} - 可在运行时尝试其他摄像头")
     
+    # 显示结果
     if issues:
         print("❌ 系统需求检查失败:")
         for issue in issues:
             print(f"  • {issue}")
         print("\n请解决上述问题后重试")
         return False
-    else:
-        print("✅ 系统需求检查通过")
-        return True
+    
+    if warnings:
+        print("⚠️  检测到警告:")
+        for warning in warnings:
+            print(f"  • {warning}")
+    
+    print("✅ 系统需求检查通过")
+    return True
 
 def main():
     """主函数"""
