@@ -718,17 +718,38 @@ class GestureVisualizer:
         output = image.copy()
         color = self.gesture_colors.get(result.gesture, (255, 255, 255))
         
+        # 获取图像尺寸，计算右下角位置
+        height, width = output.shape[:2]
+        
         # 主要手势信息
         gesture_text = f"Gesture: {result.gesture.upper()}"
         confidence_text = f"Confidence: {result.confidence:.2f}"
         duration_text = f"Duration: {result.duration:.1f}s"
         
+        # 计算文本宽度以便右对齐
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        gesture_size = cv2.getTextSize(gesture_text, font, 1.0, 2)[0]
+        confidence_size = cv2.getTextSize(confidence_text, font, 0.7, 2)[0]
+        duration_size = cv2.getTextSize(duration_text, font, 0.6, 2)[0]
+        
+        # 计算最大文本宽度
+        max_width = max(gesture_size[0], confidence_size[0], duration_size[0])
+        
+        # 设置右下角位置 (留出边距)
+        margin = 20
+        gesture_x = width - max_width - margin
+        gesture_y = height - 120
+        confidence_x = width - confidence_size[0] - margin  
+        confidence_y = height - 85
+        duration_x = width - duration_size[0] - margin
+        duration_y = height - 50
+        
         # 绘制文本
-        cv2.putText(output, gesture_text, (10, 40),
+        cv2.putText(output, gesture_text, (gesture_x, gesture_y),
                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, color, 2)
-        cv2.putText(output, confidence_text, (10, 75),
+        cv2.putText(output, confidence_text, (confidence_x, confidence_y),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-        cv2.putText(output, duration_text, (10, 105),
+        cv2.putText(output, duration_text, (duration_x, duration_y),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         
         # 绘制置信度条
@@ -743,13 +764,18 @@ class GestureVisualizer:
             self._highlight_relevant_landmarks(output, landmarks, result.gesture)
         
         return output
-    
     def _draw_confidence_bar(self, image: np.ndarray, confidence: float, color: Tuple[int, int, int]):
         """绘制置信度条"""
-        bar_x = 10
-        bar_y = 120
+        height, width = image.shape[:2]
+        
+        # 置信度条尺寸
         bar_width = 200
         bar_height = 15
+        margin = 20
+        
+        # 在右下角位置 (文本下方)
+        bar_x = width - bar_width - margin
+        bar_y = height - 25  # 在duration文本下方一点
         
         # 背景条
         cv2.rectangle(image, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), 
@@ -763,10 +789,16 @@ class GestureVisualizer:
         # 边框
         cv2.rectangle(image, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), 
                      (255, 255, 255), 1)
-    
     def _draw_details(self, image: np.ndarray, details: Dict):
         """绘制详细信息"""
-        y_offset = 150
+        height, width = image.shape[:2]
+        
+        # 计算详细信息显示位置 (在主要信息的左侧)
+        margin = 20
+        detail_x = width - 450  # 在主要信息左侧显示
+        detail_y_start = height - 140
+        
+        y_offset = detail_y_start
         for key, value in details.items():
             if key == 'error':
                 continue
@@ -781,9 +813,11 @@ class GestureVisualizer:
                 text = f"{key}: {str(value)}"
                 color = (200, 200, 200)
             
-            cv2.putText(image, text, (10, y_offset),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
-            y_offset += 20
+            # 确保不超出图像边界
+            if detail_x > 0 and y_offset < height - 20:
+                cv2.putText(image, text, (detail_x, y_offset),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+                y_offset += 20
     
     def _highlight_relevant_landmarks(self, image: np.ndarray, landmarks, gesture: str):
         """高亮相关关键点"""
