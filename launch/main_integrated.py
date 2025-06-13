@@ -11,11 +11,12 @@ import os
 import logging
 import argparse
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from PIL import Image, ImageTk
 import threading
 import queue
 from typing import Optional, Dict, Any
+from datetime import datetime
 
 # 配置日志
 logging.basicConfig(
@@ -571,17 +572,22 @@ class IntegratedGestureGUI:
         self.gesture_var = None
         self.distance_var = None
         self.confidence_var = None
-        
-        # 统计信息
+          # 统计信息
         self.frame_count = 0
         self.start_time = time.time()
         self.last_command = "none"
         self.last_command_time = 0
         
+        # 录制和截图相关
+        self.is_recording = False
+        self.video_writer = None
+        self.recording_path = None
+        self.current_frame = None  # 存储当前帧用于截图
+        
         # 线程管理
         self.process_thread = None
         self.frame_queue = queue.Queue(maxsize=5)
-        self.result_queue = queue.Queue(maxsize=10)        # 创建GUI界面
+        self.result_queue = queue.Queue(maxsize=10)# 创建GUI界面
         self.create_gui()
         
         # 初始化系统组件
@@ -750,8 +756,7 @@ class IntegratedGestureGUI:
         
         self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         log_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # 清除日志按钮
+          # 清除日志按钮
         ttk.Button(log_frame, text="清除日志", command=self.clear_log).pack(pady=2)
     
     def create_video_panel(self, parent):
@@ -764,14 +769,15 @@ class IntegratedGestureGUI:
         self.video_canvas.pack(pady=10)
         
         # 视频控制按钮
-        video_control_frame = ttk.Frame(video_frame)
-        video_control_frame.pack(fill=tk.X)
+        self.video_control_frame = ttk.Frame(video_frame)
+        self.video_control_frame.pack(fill=tk.X)
         
-        ttk.Button(video_control_frame, text="截图保存", 
+        ttk.Button(self.video_control_frame, text="截图保存", 
                   command=self.save_screenshot).pack(side=tk.LEFT, padx=5)
-        ttk.Button(video_control_frame, text="录制视频", 
-                  command=self.toggle_recording).pack(side=tk.LEFT, padx=5)
-        ttk.Button(video_control_frame, text="重置统计", 
+        self.record_button = ttk.Button(self.video_control_frame, text="录制视频", 
+                  command=self.toggle_recording)
+        self.record_button.pack(side=tk.LEFT, padx=5)
+        ttk.Button(self.video_control_frame, text="重置统计", 
                   command=self.reset_statistics).pack(side=tk.LEFT, padx=5)
     
     def create_status_bar(self, parent):
@@ -813,12 +819,11 @@ class IntegratedGestureGUI:
             
             # 启动GUI更新
             self.update_gui()
-            
-            # 更新按钮状态
+              # 更新按钮状态
             self.start_button.config(state=tk.DISABLED)
             self.stop_button.config(state=tk.NORMAL)
             self.pause_button.config(state=tk.NORMAL)
-              # 禁用摄像头选择，防止运行时更改
+            # 禁用摄像头选择，防止运行时更改
             self.camera_combo.config(state=tk.DISABLED)
             
             self.status_var.set("系统运行中...")
@@ -834,10 +839,20 @@ class IntegratedGestureGUI:
         """停止系统"""
         self.is_running = False
         
+        # 停止录制（如果正在录制）
+        if self.is_recording:
+            try:
+                self.stop_recording()
+            except Exception as e:
+                self.log_message(f"⚠️ 停止录制时出错: {e}")
+        
         # 停止摄像头
         if self.camera_capture:
             self.camera_capture.stop()
             self.camera_capture = None
+        
+        # 清空当前帧
+        self.current_frame = None
         
         # 更新按钮状态
         self.start_button.config(state=tk.NORMAL)
@@ -1092,14 +1107,20 @@ class IntegratedGestureGUI:
         # 模式信息
         cv2.putText(frame, f"Mode: {self.current_mode}", (10, 30),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-        
-        # 最后指令
+          # 最后指令
         if self.last_command != "none":
             cv2.putText(frame, f"Last CMD: {self.last_command.upper()}", (10, 60),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
     
     def display_frame_on_canvas(self, frame):
         """在画布上显示帧"""
+        # 存储当前帧用于截图和录制
+        self.current_frame = frame.copy()
+        
+        # 如果正在录制，写入视频文件
+        if self.is_recording and self.video_writer is not None:
+            self.video_writer.write(frame)
+        
         # 转换为RGB
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
@@ -1144,8 +1165,7 @@ class IntegratedGestureGUI:
         else:
             self.gesture_var.set("手势: 未检测")
             self.confidence_var.set("置信度: 0.0%")
-        
-        # 更新距离信息
+          # 更新距离信息
         distance_result = result.get('distance_result')
         if distance_result:
             self.distance_var.set(f"距离: {distance_result.distance:.2f}m")
@@ -1166,11 +1186,136 @@ class IntegratedGestureGUI:
     
     def save_screenshot(self):
         """保存截图"""
-        self.log_message("📸 截图功能待实现")
+        try:
+            if self.current_frame is None:
+                self.log_message("❌ 没有可保存的图像")
+                messagebox.showwarning("警告", "没有可保存的图像")
+                return
+            
+            # 获取默认文件名（时间戳）
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            default_filename = f"screenshot_{timestamp}.jpg"
+            
+            # 打开文件保存对话框
+            file_path = filedialog.asksaveasfilename(
+                title="保存截图",
+                defaultextension=".jpg",
+                initialname=default_filename,
+                filetypes=[
+                    ("JPEG files", "*.jpg"),
+                    ("PNG files", "*.png"),
+                    ("All files", "*.*")
+                ]
+            )
+            
+            if file_path:
+                # 保存截图
+                success = cv2.imwrite(file_path, self.current_frame)
+                if success:
+                    self.log_message(f"📸 截图已保存: {os.path.basename(file_path)}")
+                    messagebox.showinfo("成功", f"截图已保存至:\n{file_path}")
+                else:
+                    self.log_message("❌ 截图保存失败")
+                    messagebox.showerror("错误", "截图保存失败")
+            else:            self.log_message("📸 截图保存取消")
+                
+        except Exception as e:
+            error_msg = f"保存截图时发生错误: {e}"
+            self.log_message(f"❌ {error_msg}")
+            messagebox.showerror("错误", error_msg)
+            logger.error(error_msg)
     
     def toggle_recording(self):
         """切换录制状态"""
-        self.log_message("🎥 录制功能待实现")
+        try:
+            if not self.is_recording:
+                # 开始录制
+                self.start_recording()
+            else:
+                # 停止录制
+                self.stop_recording()
+        except Exception as e:
+            error_msg = f"录制操作失败: {e}"
+            self.log_message(f"❌ {error_msg}")
+            messagebox.showerror("错误", error_msg)
+            logger.error(error_msg)
+    
+    def start_recording(self):
+        """开始录制视频"""
+        try:
+            if self.current_frame is None:
+                self.log_message("❌ 没有可录制的视频流")
+                messagebox.showwarning("警告", "没有可录制的视频流")
+                return
+            
+            # 获取默认文件名（时间戳）
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            default_filename = f"recording_{timestamp}.avi"
+            
+            # 打开文件保存对话框
+            file_path = filedialog.asksaveasfilename(
+                title="保存录制视频",
+                defaultextension=".avi",
+                initialname=default_filename,
+                filetypes=[
+                    ("AVI files", "*.avi"),
+                    ("MP4 files", "*.mp4"),
+                    ("All files", "*.*")
+                ]
+            )
+            
+            if not file_path:
+                self.log_message("🎥 录制取消")
+                return
+            
+            # 获取视频参数
+            height, width = self.current_frame.shape[:2]
+            fps = 20.0  # 默认20 FPS
+              # 根据文件扩展名选择编码器
+            if file_path.lower().endswith('.mp4'):
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            else:
+                fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            
+            # 创建VideoWriter对象
+            self.video_writer = cv2.VideoWriter(file_path, fourcc, fps, (width, height))
+            if not self.video_writer.isOpened():
+                raise Exception("无法创建视频写入器")
+            
+            self.is_recording = True
+            self.recording_path = file_path
+              # 更新按钮文本
+            self.record_button.config(text="停止录制")
+            
+            self.log_message(f"🎥 开始录制视频: {os.path.basename(file_path)}")
+            
+        except Exception as e:
+            self.log_message(f"❌ 开始录制失败: {e}")
+            raise
+    
+    def stop_recording(self):
+        """停止录制视频"""
+        try:
+            if self.video_writer is not None:
+                self.video_writer.release()
+                self.video_writer = None
+            
+            self.is_recording = False
+            recording_file = self.recording_path
+            self.recording_path = None
+            
+            # 更新按钮文本
+            self.record_button.config(text="录制视频")
+            
+            if recording_file:
+                self.log_message(f"🎥 录制完成: {os.path.basename(recording_file)}")
+                messagebox.showinfo("录制完成", f"视频已保存至:\n{recording_file}")
+            else:
+                self.log_message("🎥 录制已停止")
+                
+        except Exception as e:
+            self.log_message(f"❌ 停止录制失败: {e}")
+            raise
     
     def reset_statistics(self):
         """重置统计"""
