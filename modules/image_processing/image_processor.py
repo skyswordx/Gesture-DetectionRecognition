@@ -321,13 +321,13 @@ class ImageQualityAssessment:
         overall_quality = "good" if all([is_sharp, is_bright_ok, is_size_ok]) else "poor"
         
         if not is_sharp:
-            quality_reason = "图像模糊"
+            quality_reason = "Blurry image"
         elif not is_bright_ok:
-            quality_reason = "亮度异常"
+            quality_reason = "Abnormal brightness"
         elif not is_size_ok:
-            quality_reason = "尺寸过小"
+            quality_reason = "Size too small"
         else:
-            quality_reason = "质量良好"
+            quality_reason = "Good quality"
         
         return {
             "valid": overall_quality == "good",

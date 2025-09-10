@@ -340,60 +340,60 @@ class GestureControlSystem:
         """绘制增强的图像质量警告"""
         output = frame.copy()
         
-        # 获取详细的质量信息
-        reason = quality.get('reason', '未知原因')
+        # Get detailed quality information
+        reason = quality.get('reason', 'Unknown reason')
         suggestions = self._get_quality_suggestions(reason)
         
-        # 创建警告背景
+        # Create warning background
         h, w = output.shape[:2]
         overlay = output.copy()
         cv2.rectangle(overlay, (10, 10), (w - 10, 120), (0, 0, 255), -1)
         cv2.addWeighted(overlay, 0.8, output, 0.2, 0, output)
         
-        # 主要警告文字
-        cv2.putText(output, f"图像质量差: {reason}", (20, 40),
+        # Main warning text
+        cv2.putText(output, f"Poor Image Quality: {reason}", (20, 40),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         
-        # 建议文字
-        cv2.putText(output, f"建议: {suggestions}", (20, 70),
+        # Suggestion text
+        cv2.putText(output, f"Suggestion: {suggestions}", (20, 70),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
         
-        # 状态指示
-        cv2.putText(output, "等待改善中...", (20, 100),
+        # Status indicator
+        cv2.putText(output, "Waiting for improvement...", (20, 100),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
         
         return output
     
     def _get_quality_suggestions(self, reason):
-        """根据质量问题提供建议"""
+        """Provide suggestions based on quality issues"""
         suggestions = {
-            '光线过暗': '增加光照或移至明亮区域',
-            '图像模糊': '保持摄像头稳定，调整焦距',
-            '噪点过多': '改善光照条件',
-            '对比度低': '调整环境光线或摄像头设置',
-            '未知原因': '检查摄像头连接和环境'
+            'Blurry image': 'Keep camera stable, adjust focus',
+            'Abnormal brightness': 'Adjust ambient light or camera settings',
+            'Size too small': 'Move closer or increase resolution',
+            'Good quality': 'Quality is good',
+            'Unknown reason': 'Check camera connection and environment'
         }
-        return suggestions.get(reason, '检查摄像头和环境条件')
+        return suggestions.get(reason, 'Check camera and environment conditions')
     
     def _draw_enhanced_no_person_warning(self, frame):
         """绘制增强的未检测到人体警告"""
         output = frame.copy()
         h, w = output.shape[:2]
         
-        # 创建信息背景
+        # Create information background
         overlay = output.copy()
         cv2.rectangle(overlay, (10, 10), (w - 10, 150), (255, 165, 0), -1)
         cv2.addWeighted(overlay, 0.8, output, 0.2, 0, output)
         
-        # 主要警告
-        cv2.putText(output, "未检测到人体", (20, 50),
+        # Main warning
+        cv2.putText(output, "No Person Detected", (20, 50),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
         
-        # 使用建议
+        # Usage suggestions
         suggestions = [
-            "确保全身在画面中",
-            "保持适当距离 (1-3米)",
-            "面向摄像头站立"
+            "Ensure full body is in frame",
+            "Maintain proper distance (1-3m)",
+            "Face the camera while standing"
         ]
         
         for i, suggestion in enumerate(suggestions):
@@ -403,66 +403,66 @@ class GestureControlSystem:
         return output
     
     def _draw_error_frame(self, frame, error_msg):
-        """绘制错误信息帧"""
+        """Draw error information frame"""
         output = frame.copy()
         h, w = output.shape[:2]
         
-        # 创建错误背景
+        # Create error background
         overlay = output.copy()
         cv2.rectangle(overlay, (10, 10), (w - 10, 100), (0, 0, 128), -1)
         cv2.addWeighted(overlay, 0.9, output, 0.1, 0, output)
         
-        # 错误信息
-        cv2.putText(output, "系统错误", (20, 40),
+        # Error information
+        cv2.putText(output, "System Error", (20, 40),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-        cv2.putText(output, f"错误: {error_msg[:50]}", (20, 70),
+        cv2.putText(output, f"Error: {error_msg[:50]}", (20, 70),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
         
         return output
     
     def _draw_enhanced_system_status(self, image, quality):
-        """绘制增强的系统状态信息"""
+        """Draw enhanced system status information"""
         try:
-            # FPS信息 - 带颜色指示
+            # FPS information - with color indication
             fps = self.camera_capture.get_fps() if self.camera_capture else 0.0
             fps_color = (0, 255, 0) if fps > 20 else (0, 255, 255) if fps > 10 else (0, 0, 255)
             cv2.putText(image, f"FPS: {fps:.1f}", (image.shape[1] - 120, 30),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, fps_color, 2)
             
-            # 图像质量 - 带状态指示
+            # Image quality - with status indication
             if quality:
                 quality_text = quality.get('quality', 'Good')
                 quality_color = (0, 255, 0) if quality.get('valid', True) else (0, 0, 255)
                 cv2.putText(image, f"Quality: {quality_text}", (image.shape[1] - 150, 60),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, quality_color, 1)
             
-            # 显示模式
+            # Display mode
             cv2.putText(image, f"Mode: {self.display_mode}", (10, 30),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             
-            # 当前指令 - 突出显示
+            # Current command - highlighted display
             if self.current_command != "none":
-                command_color = (0, 255, 255)  # 黄色
+                command_color = (0, 255, 255)  # Yellow
                 cv2.putText(image, f"CMD: {self.current_command.upper()}", (10, 60),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, command_color, 2)
                 
-                # 显示指令时间
+                # Display command time
                 time_since_command = time.time() - self.last_command_time
-                if time_since_command < 3.0:  # 3秒内显示倒计时
+                if time_since_command < 3.0:  # Display countdown within 3 seconds
                     remaining = 3.0 - time_since_command
                     cv2.putText(image, f"({remaining:.1f}s)", (10, 90),
                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, command_color, 1)
             
-            # 系统运行时间
+            # System runtime
             elapsed = time.time() - self.start_time
             cv2.putText(image, f"Runtime: {elapsed:.1f}s", (10, image.shape[0] - 30),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
             
-            # 帧计数
+            # Frame count
             cv2.putText(image, f"Frames: {self.frame_count}", (image.shape[1] - 120, image.shape[0] - 30),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
         except Exception as e:
-            logger.error(f"状态绘制错误: {e}")
+            logger.error(f"Status drawing error: {e}")
     
     def _handle_key_input(self, key):
         """处理键盘输入"""
