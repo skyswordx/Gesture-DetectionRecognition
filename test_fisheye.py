@@ -8,7 +8,9 @@ import os
 import sys
 
 # Add module paths
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'modules'))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+modules_path = os.path.join(current_dir, 'modules')
+sys.path.insert(0, modules_path)
 
 def test_fisheye_module():
     """Test the fisheye calibration module"""
@@ -112,7 +114,10 @@ def test_integration_with_main():
     """Test integration with main system"""
     try:
         # Try importing with the same method as main system
-        sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'modules'))
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        modules_path = os.path.join(current_dir, 'modules')
+        if modules_path not in sys.path:
+            sys.path.insert(0, modules_path)
         
         try:
             from camera_calibration import DistortionCorrector, FisheyeCalibrator
@@ -126,7 +131,8 @@ def test_integration_with_main():
         # Test initialization as would be done in main system
         if FISHEYE_AVAILABLE:
             # Create dummy calibration file in expected location
-            calibration_dir = os.path.join(os.path.dirname(__file__), '..', 'calibration_data')
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            calibration_dir = os.path.join(current_dir, 'calibration_data')
             os.makedirs(calibration_dir, exist_ok=True)
             
             create_dummy_calibration()
