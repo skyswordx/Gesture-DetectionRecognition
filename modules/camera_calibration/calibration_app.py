@@ -6,9 +6,16 @@ Interactive application for fisheye camera calibration and testing
 import cv2
 import numpy as np
 import os
+import sys
 import argparse
 import logging
 from typing import Optional
+
+# Add parent directory to path to import camera_calibration
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
+
 from camera_calibration import (
     FisheyeCalibrator, 
     DistortionCorrector, 

@@ -1,31 +1,31 @@
-# Fisheye Camera Calibration Module
+# 鱼眼摄像头标定模块
 
-This module provides comprehensive fisheye camera calibration and distortion correction functionality for the Gesture Recognition System. It's designed to be modular, easy to use, and suitable for drone applications.
+本模块为手势识别系统提供全面的鱼眼摄像头标定和畸变校正功能。设计为模块化、易于使用，适用于无人机应用。
 
-## Features
+## 功能特性
 
-- **Fisheye Camera Calibration**: Accurate calibration using chessboard patterns
-- **Real-time Distortion Correction**: Fast distortion correction with optimized algorithms
-- **Interactive Calibration App**: User-friendly application for camera calibration
-- **Parameter Adjustment**: Real-time parameter tuning for optimal results
-- **Visualization Tools**: Comprehensive visualization for calibration process
-- **Performance Monitoring**: Built-in performance statistics and quality assessment
+- **鱼眼摄像头标定**: 使用棋盘格模式进行精确标定
+- **实时畸变校正**: 使用优化算法进行快速畸变校正
+- **交互式标定应用**: 用户友好的摄像头标定应用程序
+- **参数调节**: 实时参数调整以获得最佳效果
+- **可视化工具**: 标定过程的全面可视化
+- **性能监控**: 内置性能统计和质量评估
 
-## Module Structure
+## 模块结构
 
 ```
 camera_calibration/
-├── __init__.py                 # Module initialization
-├── fisheye_calibrator.py       # Core calibration functionality
-├── distortion_corrector.py     # Real-time distortion correction
-├── calibration_visualizer.py   # Visualization tools
-├── calibration_app.py          # Interactive calibration application
-└── README.md                   # This documentation
+├── __init__.py                 # 模块初始化
+├── fisheye_calibrator.py       # 核心标定功能
+├── distortion_corrector.py     # 实时畸变校正
+├── calibration_visualizer.py   # 可视化工具
+├── calibration_app.py          # 交互式标定应用
+└── README.md                   # 本文档
 ```
 
-## Quick Start
+## 快速开始
 
-### 1. Basic Usage
+### 1. 基本用法
 
 ```python
 from modules.camera_calibration import (
@@ -34,62 +34,62 @@ from modules.camera_calibration import (
     CalibrationVisualizer
 )
 
-# Initialize calibrator
+# 初始化标定器
 calibrator = FisheyeCalibrator(chessboard_size=(9, 6), square_size=1.0)
 
-# Add calibration images (with chessboard pattern)
+# 添加标定图像（含棋盘格模式）
 for image in calibration_images:
     calibrator.add_calibration_image(image)
 
-# Perform calibration
+# 执行标定
 result = calibrator.calibrate()
 
-# Create distortion corrector
+# 创建畸变校正器
 corrector = DistortionCorrector(result)
 
-# Correct images
+# 校正图像
 corrected_image = corrector.correct_distortion(fisheye_image)
 ```
 
-### 2. Interactive Calibration
+### 2. 交互式标定
 
-Run the interactive calibration application:
+运行交互式标定应用程序：
 
 ```bash
 cd modules/camera_calibration
 python calibration_app.py --camera 0 --board-width 9 --board-height 6
 ```
 
-**Controls:**
-- `c`: Switch to capture mode
-- `Space`: Capture calibration image
-- `o`: Toggle auto-capture mode
-- `l`: Perform calibration
-- `t`: Test distortion correction
-- `a`: Adjust correction parameters
-- `s`: Save calibration data
-- `d`: Load calibration data
-- `h`: Toggle help display
-- `q`: Quit application
+**控制键：**
+- `c`: 切换到捕获模式
+- `空格键`: 捕获标定图像
+- `o`: 切换自动捕获模式
+- `l`: 执行标定
+- `t`: 测试畸变校正
+- `a`: 调整校正参数
+- `s`: 保存标定数据
+- `d`: 加载标定数据
+- `h`: 切换帮助显示
+- `q`: 退出应用程序
 
-### 3. Integration with Main System
+### 3. 与主系统集成
 
 ```python
-# In your main gesture recognition system
+# 在你的主手势识别系统中
 from modules.camera_calibration import DistortionCorrector
 
 class GestureControlSystem:
     def __init__(self):
-        # ... existing initialization ...
+        # ... 现有初始化 ...
         
-        # Initialize distortion corrector
+        # 初始化畸变校正器
         self.distortion_corrector = DistortionCorrector()
         
-        # Load pre-calibrated parameters
+        # 加载预标定参数
         if self.load_camera_calibration():
-            print("Fisheye correction enabled")
+            print("鱼眼校正已启用")
         else:
-            print("Running without fisheye correction")
+            print("运行时不使用鱼眼校正")
     
     def load_camera_calibration(self):
         try:
@@ -99,110 +99,110 @@ class GestureControlSystem:
                 self.distortion_corrector.set_calibration(calibrator.calibration_result)
                 return True
         except Exception as e:
-            logger.warning(f"Failed to load camera calibration: {e}")
+            logger.warning(f"加载摄像头标定失败: {e}")
         return False
     
     def process_frame(self):
-        # Get camera frame
+        # 获取摄像头帧
         frame = self.camera_capture.get_frame()
         
-        # Apply distortion correction if available
+        # 如果可用，应用畸变校正
         if self.distortion_corrector.is_initialized:
             frame = self.distortion_corrector.correct_distortion(frame)
         
-        # Continue with existing processing...
-        # pose detection, gesture recognition, etc.
+        # 继续现有处理...
+        # 姿势检测、手势识别等
 ```
 
-## Calibration Process
+## 标定过程
 
-### 1. Preparation
+### 1. 准备工作
 
-1. **Print Chessboard Pattern**: Print a high-quality chessboard pattern
-   - Default size: 9x6 internal corners
-   - Ensure flat printing without distortion
-   - Mount on rigid surface
+1. **打印棋盘格模式**: 打印高质量的棋盘格模式
+   - 默认尺寸: 9x6内部角点
+   - 确保平整打印，无畸变
+   - 安装在刚性表面上
 
-2. **Setup Environment**: 
-   - Good, even lighting
-   - Stable camera mount
-   - Clear view of chessboard
+2. **设置环境**: 
+   - 良好的均匀照明
+   - 稳定的摄像头安装
+   - 清晰的棋盘格视野
 
-### 2. Calibration Steps
+### 2. 标定步骤
 
-1. **Start Application**: `python calibration_app.py`
-2. **Capture Mode**: Press `c` to enter capture mode
-3. **Collect Images**: 
-   - Hold chessboard at various positions and angles
-   - Capture 15-30 images with `Space` or enable auto-capture with `o`
-   - Cover different areas of the fisheye field of view
-4. **Calibrate**: Press `l` to perform calibration
-5. **Test Results**: Press `t` to test distortion correction
-6. **Adjust Parameters**: Press `a` to fine-tune correction parameters
-7. **Save**: Press `s` to save calibration data
+1. **启动应用**: `python calibration_app.py`
+2. **捕获模式**: 按 `c` 进入捕获模式
+3. **收集图像**: 
+   - 将棋盘格放置在不同位置和角度
+   - 使用`空格键`捕获15-30张图像，或按`o`启用自动捕获
+   - 覆盖鱼眼视野的不同区域
+4. **标定**: 按 `l` 执行标定
+5. **测试结果**: 按 `t` 测试畸变校正
+6. **调整参数**: 按 `a` 微调校正参数
+7. **保存**: 按 `s` 保存标定数据
 
-### 3. Quality Assessment
+### 3. 质量评估
 
-Good calibration should have:
-- **RMS Error < 1.0**: Lower is better
-- **15+ Images**: More images improve accuracy
-- **Good Coverage**: Images from different angles and distances
-- **Clear Patterns**: All chessboard corners detected
+良好的标定应该具有：
+- **RMS误差 < 1.0**: 越低越好
+- **15张以上图像**: 更多图像提高精度
+- **良好覆盖**: 来自不同角度和距离的图像
+- **清晰模式**: 检测到所有棋盘格角点
 
-## Parameter Tuning
+## 参数调节
 
-### Distortion Correction Parameters
+### 畸变校正参数
 
-- **Balance (0.0-1.0)**: 
-  - 0.0: Retain all original image content (black borders)
-  - 1.0: Fill entire output image (may crop content)
+- **平衡系数 (0.0-1.0)**: 
+  - 0.0: 保留所有原始图像内容（黑色边框）
+  - 1.0: 填充整个输出图像（可能裁剪内容）
   
-- **FOV Scale (0.1-2.0)**: 
-  - <1.0: Zoom in (crop field of view)
-  - >1.0: Zoom out (expand field of view)
+- **视野缩放 (0.1-2.0)**: 
+  - <1.0: 放大（裁剪视野）
+  - >1.0: 缩小（扩展视野）
   
-- **Crop Factor (0.1-1.0)**: 
-  - Additional cropping of corrected image
-  - Useful for removing distorted edges
+- **裁剪系数 (0.1-1.0)**: 
+  - 校正图像的附加裁剪
+  - 用于去除畸变边缘
 
-### Real-time Adjustment
+### 实时调整
 
-In adjust mode (`a`):
-- `1/2`: Increase/decrease balance
-- `3/4`: Increase/decrease FOV scale  
-- `5/6`: Increase/decrease crop factor
-- `r`: Reset to defaults
+在调整模式中（`a`）：
+- `1/2`: 增加/减少平衡系数
+- `3/4`: 增加/减少视野缩放
+- `5/6`: 增加/减少裁剪系数
+- `r`: 重置为默认值
 
-## Performance Optimization
+## 性能优化
 
-### For Real-time Applications
+### 实时应用
 
 ```python
-# Initialize once
+# 初始化一次
 corrector = DistortionCorrector(calibration_result)
 
-# Fast correction using pre-computed maps
+# 使用预计算映射进行快速校正
 corrected = corrector.correct_distortion(image, fast_mode=True)
 ```
 
-### For Drone Applications
+### 无人机应用
 
 ```python
-# Use adaptive corrector for varying conditions
+# 对变化条件使用自适应校正器
 from modules.camera_calibration import AdaptiveDistortionCorrector
 
 corrector = AdaptiveDistortionCorrector(calibration_result)
 
-# Auto-adjust parameters based on first few frames
+# 基于前几帧自动调整参数
 corrector.auto_adjust_parameters(sample_image)
 
-# Continue with optimized settings
+# 使用优化设置继续
 corrected = corrector.correct_distortion(image)
 ```
 
-## File Formats
+## 文件格式
 
-### Calibration Data (JSON)
+### 标定数据 (JSON)
 ```json
 {
   "camera_matrix": [[fx, 0, cx], [0, fy, cy], [0, 0, 1]],
@@ -214,88 +214,88 @@ corrected = corrector.correct_distortion(image)
 }
 ```
 
-## Troubleshooting
+## 故障排除
 
-### Common Issues
+### 常见问题
 
-1. **High RMS Error (>2.0)**:
-   - Ensure chessboard is flat and high-quality
-   - Improve lighting conditions
-   - Capture more diverse images
-   - Check camera focus
+1. **高RMS误差 (>2.0)**：
+   - 确保棋盘格平整且高质量
+   - 改善照明条件
+   - 捕获更多样化的图像
+   - 检查摄像头焦距
 
-2. **Chessboard Not Detected**:
-   - Improve lighting (avoid shadows/glare)
-   - Ensure chessboard is clearly visible
-   - Check chessboard size parameters
-   - Clean camera lens
+2. **棋盘格未检测到**：
+   - 改善照明（避免阴影/眩光）
+   - 确保棋盘格清晰可见
+   - 检查棋盘格尺寸参数
+   - 清洁摄像头镜头
 
-3. **Poor Correction Quality**:
-   - Recalibrate with more images
-   - Adjust correction parameters
-   - Use higher resolution images
-   - Ensure calibration covers full FOV
+3. **校正质量差**：
+   - 用更多图像重新标定
+   - 调整校正参数
+   - 使用更高分辨率图像
+   - 确保标定覆盖全视野
 
-4. **Performance Issues**:
-   - Use fast_mode=True for real-time
-   - Reduce image resolution
-   - Optimize correction parameters
-   - Consider hardware acceleration
+4. **性能问题**：
+   - 对实时应用使用fast_mode=True
+   - 降低图像分辨率
+   - 优化校正参数
+   - 考虑硬件加速
 
-### Debug Mode
+### 调试模式
 
-Enable debug logging:
+启用调试日志：
 ```python
 import logging
 logging.basicConfig(level=logging.DEBUG)
 ```
 
-## Integration Examples
+## 集成示例
 
-### Example 1: Gesture Recognition System
+### 示例1: 手势识别系统
 
 ```python
 def integrate_fisheye_correction(self):
-    """Add fisheye correction to existing system"""
+    """向现有系统添加鱼眼校正"""
     try:
         from modules.camera_calibration import DistortionCorrector, FisheyeCalibrator
         
-        # Load calibration
+        # 加载标定
         calibrator = FisheyeCalibrator()
         if calibrator.load_calibration("calibration_data/fisheye_calibration.json"):
             self.fisheye_corrector = DistortionCorrector(calibrator.calibration_result)
-            logger.info("Fisheye correction enabled")
+            logger.info("鱼眼校正已启用")
             return True
     except Exception as e:
-        logger.warning(f"Fisheye correction not available: {e}")
+        logger.warning(f"鱼眼校正不可用: {e}")
     
     self.fisheye_corrector = None
     return False
 
 def process_camera_frame(self, frame):
-    """Process frame with optional fisheye correction"""
-    # Apply fisheye correction if available
+    """使用可选鱼眼校正处理帧"""
+    # 如果可用，应用鱼眼校正
     if self.fisheye_corrector and self.fisheye_corrector.is_initialized:
         frame = self.fisheye_corrector.correct_distortion(frame)
     
-    # Continue with existing processing
+    # 继续现有处理
     return self.existing_frame_processor(frame)
 ```
 
-### Example 2: Parameter Adjustment UI
+### 示例2: 参数调整界面
 
 ```python
 def create_adjustment_interface(self):
-    """Create parameter adjustment interface"""
+    """创建参数调整界面"""
     if not self.fisheye_corrector:
         return
     
-    cv2.namedWindow("Fisheye Parameters")
+    cv2.namedWindow("鱼眼参数")
     
-    # Create trackbars
-    cv2.createTrackbar("Balance", "Fisheye Parameters", 0, 100, self.on_balance_change)
-    cv2.createTrackbar("FOV Scale", "Fisheye Parameters", 100, 200, self.on_fov_change)
-    cv2.createTrackbar("Crop", "Fisheye Parameters", 100, 100, self.on_crop_change)
+    # 创建滑动条
+    cv2.createTrackbar("平衡", "鱼眼参数", 0, 100, self.on_balance_change)
+    cv2.createTrackbar("视野缩放", "鱼眼参数", 100, 200, self.on_fov_change)
+    cv2.createTrackbar("裁剪", "鱼眼参数", 100, 100, self.on_crop_change)
 
 def on_balance_change(self, val):
     balance = val / 100.0
@@ -306,14 +306,14 @@ def on_fov_change(self, val):
     self.fisheye_corrector.set_correction_parameters(fov_scale=fov_scale)
 ```
 
-## Future Enhancements
+## 未来增强
 
-- **Multi-camera calibration**: Support for stereo fisheye setups
-- **Online calibration**: Continuous calibration refinement
-- **GPU acceleration**: CUDA/OpenCL support for faster processing
-- **Automatic pattern detection**: Support for different calibration patterns
-- **Quality-based parameter optimization**: Automatic parameter tuning
+- **多摄像头标定**: 支持立体鱼眼设置
+- **在线标定**: 持续标定细化
+- **GPU加速**: CUDA/OpenCL支持以实现更快处理
+- **自动模式检测**: 支持不同标定模式
+- **基于质量的参数优化**: 自动参数调整
 
-## License
+## 许可证
 
-This module is part of the Gesture Recognition Control System and follows the same license terms.
+本模块是手势识别控制系统的一部分，遵循相同的许可条款。
