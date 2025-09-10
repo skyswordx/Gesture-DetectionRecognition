@@ -35,6 +35,14 @@ try:
     from distance_estimation.distance_estimator import DistanceEstimator, DistanceVisualizer
     from gesture_recognition.gesture_recognizer import GestureRecognizer, GestureVisualizer
     
+    # Try to import fisheye calibration module (optional)
+    try:
+        from camera_calibration import DistortionCorrector, FisheyeCalibrator
+        FISHEYE_AVAILABLE = True
+    except ImportError:
+        FISHEYE_AVAILABLE = False
+        logger.info("Fisheye calibration module not available")
+    
 except ImportError as e:
     logger.error(f"模块导入失败: {e}")
     print(f"模块导入失败: {e}")
@@ -74,6 +82,13 @@ class GestureControlSystem:
             # 手势识别模块
             self.gesture_recognizer = GestureRecognizer()
             self.gesture_visualizer = GestureVisualizer()
+            
+            # 鱼眼校正模块 (可选)
+            self.fisheye_corrector = None
+            self.fisheye_enabled = False
+            if FISHEYE_AVAILABLE:
+                self._initialize_fisheye_correction()
+                
         except Exception as e:
             logger.error(f"组件初始化失败: {e}")
             print(f"❌ 组件初始化失败: {e}")
@@ -93,6 +108,40 @@ class GestureControlSystem:
         
         print("手势控制系统初始化完成")
         self._print_supported_gestures()
+    
+    def _initialize_fisheye_correction(self):
+        """初始化鱼眼校正功能"""
+        try:
+            calibrator = FisheyeCalibrator()
+            calibration_path = os.path.join(os.path.dirname(__file__), '..', 'calibration_data', 'fisheye_calibration.json')
+            
+            if os.path.exists(calibration_path):
+                if calibrator.load_calibration(calibration_path):
+                    self.fisheye_corrector = DistortionCorrector(calibrator.calibration_result)
+                    self.fisheye_enabled = True
+                    logger.info("Fisheye correction enabled")
+                    print("✅ 鱼眼校正功能已启用")
+                else:
+                    logger.warning("Failed to load fisheye calibration")
+                    print("⚠️ 鱼眼校正标定文件加载失败")
+            else:
+                logger.info("No fisheye calibration file found")
+                print("ℹ️ 未找到鱼眼校正标定文件，使用普通模式")
+        except Exception as e:
+            logger.error(f"Fisheye correction initialization failed: {e}")
+            print(f"⚠️ 鱼眼校正初始化失败: {e}")
+            self.fisheye_corrector = None
+            self.fisheye_enabled = False
+    
+    def toggle_fisheye_correction(self):
+        """切换鱼眼校正功能"""
+        if self.fisheye_corrector is not None:
+            self.fisheye_enabled = not self.fisheye_enabled
+            status = "启用" if self.fisheye_enabled else "禁用"
+            print(f"鱼眼校正功能: {status}")
+            logger.info(f"Fisheye correction: {'enabled' if self.fisheye_enabled else 'disabled'}")
+        else:
+            print("鱼眼校正功能不可用")
     
     def _print_supported_gestures(self):
         """打印支持的手势"""
@@ -168,6 +217,8 @@ class GestureControlSystem:
         print("  'd' - 切换调试信息")
         print("  's' - 显示统计信息")
         print("  'r' - 重置统计")
+        if FISHEYE_AVAILABLE:
+            print("  'f' - 切换鱼眼校正")
         print("=" * 60)
         
         try:
@@ -203,10 +254,16 @@ class GestureControlSystem:
             if frame is None:
                 return None
             
-            # 2. 图像预处理
+            # 2. 鱼眼校正 (如果启用)
+            if self.fisheye_enabled and self.fisheye_corrector is not None:
+                corrected_frame = self.fisheye_corrector.correct_distortion(frame)
+                if corrected_frame is not None:
+                    frame = corrected_frame
+            
+            # 3. 图像预处理
             processed_frame = self.image_processor.preprocess(frame)
             
-            # 3. 图像质量评估
+            # 4. 图像质量评估
             quality = self.quality_assessor.assess_quality(processed_frame)
             
             if not quality.get('valid', True):
@@ -214,7 +271,7 @@ class GestureControlSystem:
                 warning_frame = self._draw_enhanced_quality_warning(processed_frame, quality)
                 return warning_frame
             
-            # 4. 姿势检测
+            # 5. 姿势检测
             pose_result = self.pose_detector.detect(processed_frame)
             
             if not pose_result.landmarks:
@@ -222,14 +279,14 @@ class GestureControlSystem:
                 no_person_frame = self._draw_enhanced_no_person_warning(processed_frame)
                 return no_person_frame
             
-            # 5. 距离估算
+            # 6. 距离估算
             distance_result = self.distance_estimator.estimate_distance(
                 pose_result.landmarks,
                 pose_result.frame_width,
                 pose_result.frame_height
             )
             
-            # 6. 手势识别
+            # 7. 手势识别
             frame_info = {
                 'width': pose_result.frame_width,
                 'height': pose_result.frame_height
@@ -238,10 +295,10 @@ class GestureControlSystem:
                 pose_result.landmarks, frame_info
             )
             
-            # 7. 处理控制指令
+            # 8. 处理控制指令
             self._process_control_command(gesture_result, distance_result)
             
-            # 8. 可视化结果
+            # 9. 可视化结果
             output_frame = self._create_visualization(
                 processed_frame, pose_result, distance_result, gesture_result, quality
             )
@@ -495,6 +552,9 @@ class GestureControlSystem:
         elif key == ord('r'):
             self._reset_statistics()
         
+        elif key == ord('f'):
+            self.toggle_fisheye_correction()
+        
         return False
     
     def _show_statistics(self):
@@ -514,6 +574,9 @@ class GestureControlSystem:
             print("\n姿势检测模块状态: 运行正常")
             print("距离估算模块状态: 运行正常")
             print("手势识别模块状态: 运行正常")
+            if FISHEYE_AVAILABLE:
+                fisheye_status = "启用" if self.fisheye_enabled else "禁用"
+                print(f"鱼眼校正状态: {fisheye_status}")
             print(f"当前显示模式: {self.display_mode}")
             print(f"当前指令: {self.current_command}")
         except Exception as e:
