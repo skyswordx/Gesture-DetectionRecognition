@@ -1,0 +1,59 @@
+{
+  "image_width": 1920,
+  "image_height": 1080,
+  "camera_matrix": [
+    [
+      0.99963492591802749,
+      -0.023990521733013168,
+      975.43866741313047
+    ],
+    [
+      0,
+      1,
+      592.85236102590613
+    ],
+    [
+      0,
+      0,
+      1
+    ]
+  ],
+  "dist_coeffs": [
+    379.91932594099592,
+    -0.0013150683895065622,
+    1.7494551759905115E-6,
+    -4.1461578200699049E-9
+  ],
+  "pattern_cols": 9,
+  "pattern_rows": 13,
+  "square_size_mm": 30,
+  "rms_reprojection_error": 0.29061510282912872,
+  "mean_errors_per_view": [
+    0.21342661431249058,
+    0.67051894255326261,
+    0.33277850893788807,
+    0.41400963356136677,
+    0.29880311323208919,
+    0.32705196446085744,
+    0.17238503018196238,
+    0.18235004684788081,
+    0.13969600828044196,
+    0.15513116592304707
+  ],
+  "used_images": [
+    "E:\\Project\\Trisheye\\fisheye_imgs\\IMG_0086.jpg",
+    "E:\\Project\\Trisheye\\fisheye_imgs\\IMG_0087.jpg",
+    "E:\\Project\\Trisheye\\fisheye_imgs\\IMG_0088.jpg",
+    "E:\\Project\\Trisheye\\fisheye_imgs\\IMG_0089.jpg",
+    "E:\\Project\\Trisheye\\fisheye_imgs\\IMG_0090.jpg",
+    "E:\\Project\\Trisheye\\fisheye_imgs\\IMG_0092.jpg",
+    "E:\\Project\\Trisheye\\fisheye_imgs\\IMG_0093.jpg",
+    "E:\\Project\\Trisheye\\fisheye_imgs\\IMG_0094.jpg",
+    "E:\\Project\\Trisheye\\fisheye_imgs\\IMG_0095.jpg",
+    "E:\\Project\\Trisheye\\fisheye_imgs\\IMG_0096.jpg"
+  ],
+  "rejected_images": [
+    "E:\\Project\\Trisheye\\fisheye_imgs\\IMG_0091.jpg"
+  ],
+  "comment": "MATLAB fisheye calibration generated for cross-use with OpenCV."
+}

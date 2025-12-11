@@ -55,7 +55,7 @@ except ImportError as e:
 class GestureControlSystem:
     """手势控制系统 - 集成所有模块"""
     
-    def __init__(self, camera_id=0, width=640, height=480):
+    def __init__(self, camera_id=0, width=1920, height=1080):
         """初始化系统"""
         print("初始化手势控制系统...")
         
@@ -620,6 +620,10 @@ class IntegratedGestureGUI:
         self.distance_visualizer = None
         self.gesture_visualizer = None
         
+        # 鱼眼校正（GUI内开关）
+        self.fisheye_corrector = None
+        self.gui_fisheye_var = None
+        
         # 运行状态
         self.is_running = False
         self.is_paused = False
@@ -635,7 +639,8 @@ class IntegratedGestureGUI:
         self.gesture_var = None
         self.distance_var = None
         self.confidence_var = None
-          # 统计信息
+
+        # 统计信息
         self.frame_count = 0
         self.start_time = time.time()
         self.last_command = "none"
@@ -650,7 +655,9 @@ class IntegratedGestureGUI:
         # 线程管理
         self.process_thread = None
         self.frame_queue = queue.Queue(maxsize=5)
-        self.result_queue = queue.Queue(maxsize=10)# 创建GUI界面
+        self.result_queue = queue.Queue(maxsize=10)
+
+        # 创建GUI界面
         self.create_gui()
         
         # 初始化系统组件
@@ -723,10 +730,14 @@ class IntegratedGestureGUI:
         
         # 分辨率选择
         ttk.Label(camera_frame, text="分辨率:").pack(anchor=tk.W, pady=(5, 0))
-        self.resolution_var = tk.StringVar(value="640x480")
-        resolution_combo = ttk.Combobox(camera_frame, textvariable=self.resolution_var,
-                                       values=["320x240", "640x480", "800x600", "1024x768", "1280x720"],
-                                       state="readonly", width=25)
+        self.resolution_var = tk.StringVar(value="1920x1080")
+        resolution_combo = ttk.Combobox(
+            camera_frame,
+            textvariable=self.resolution_var,
+            values=["320x240", "640x480", "800x600", "1024x768", "1280x720", "1920x1080"],
+            state="readonly",
+            width=25
+        )
         resolution_combo.pack(fill=tk.X, pady=2)
         
         # 系统控制
@@ -776,6 +787,22 @@ class IntegratedGestureGUI:
         self.debug_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(settings_frame, text="显示调试信息", 
                        variable=self.debug_var, command=self.toggle_debug).pack(anchor=tk.W)
+
+        # 鱼眼去畸开关（仅当模块可用）
+        try:
+            if FISHEYE_AVAILABLE:
+                self.gui_fisheye_var = tk.BooleanVar(value=False)
+                ttk.Checkbutton(settings_frame, text="启用鱼眼去畸", 
+                                variable=self.gui_fisheye_var, command=self.toggle_fisheye_gui).pack(anchor=tk.W)
+            else:
+                self.gui_fisheye_var = tk.BooleanVar(value=False)
+                ttk.Checkbutton(settings_frame, text="启用鱼眼去畸 (模块不可用)", 
+                                variable=self.gui_fisheye_var, state=tk.DISABLED).pack(anchor=tk.W)
+        except NameError:
+            # 若上方导入失败未定义 FISHEYE_AVAILABLE
+            self.gui_fisheye_var = tk.BooleanVar(value=False)
+            ttk.Checkbutton(settings_frame, text="启用鱼眼去畸 (模块不可用)", 
+                            variable=self.gui_fisheye_var, state=tk.DISABLED).pack(anchor=tk.W)
         
         # 信息显示区域
         info_frame = ttk.LabelFrame(control_frame, text="检测信息", padding=10)
@@ -870,6 +897,10 @@ class IntegratedGestureGUI:
             self.camera_capture = CameraCapture(camera_id=camera_id, width=width, height=height)
             if not self.camera_capture.start():
                 raise Exception(f"摄像头 {camera_id} 启动失败")
+
+            # 如用户勾选鱼眼去畸且尚未初始化，尝试加载标定
+            if self.gui_fisheye_var and self.gui_fisheye_var.get():
+                self._initialize_fisheye_gui()
             
             self.is_running = True
             self.is_paused = False
@@ -955,6 +986,42 @@ class IntegratedGestureGUI:
         """切换调试信息显示"""
         self.show_debug = self.debug_var.get()
         self.log_message(f"🔧 调试信息: {'显示' if self.show_debug else '隐藏'}")
+
+    def toggle_fisheye_gui(self):
+        """GUI内切换鱼眼去畸"""
+        enabled = bool(self.gui_fisheye_var.get()) if self.gui_fisheye_var else False
+        if enabled:
+            ok = self._initialize_fisheye_gui()
+            if ok:
+                self.log_message("📷 鱼眼去畸: 启用")
+            else:
+                # 初始化失败则取消勾选
+                if self.gui_fisheye_var:
+                    self.gui_fisheye_var.set(False)
+                self.log_message("⚠️ 鱼眼去畸: 初始化失败，已禁用")
+        else:
+            self.log_message("📷 鱼眼去畸: 禁用")
+
+    def _initialize_fisheye_gui(self) -> bool:
+        """初始化GUI用的鱼眼去畸校正器"""
+        try:
+            if not 'FISHEYE_AVAILABLE' in globals() or not FISHEYE_AVAILABLE:
+                return False
+            # 延迟导入，避免GUI未使用时的依赖问题
+            from camera_calibration import FisheyeCalibrator, DistortionCorrector
+            calibration_path = os.path.join(os.path.dirname(__file__), '..', 'calibration_data', 'fisheye_calibration.json')
+            calibration_path = os.path.abspath(calibration_path)
+            if not os.path.exists(calibration_path):
+                self.log_message("ℹ️ 未找到鱼眼标定文件，路径: calibration_data/fisheye_calibration.json")
+                return False
+            calib = FisheyeCalibrator()
+            if not calib.load_calibration(calibration_path):
+                return False
+            self.fisheye_corrector = DistortionCorrector(calib.calibration_result)
+            return True
+        except Exception as e:
+            logger.warning(f"GUI fisheye init failed: {e}")
+            return False
     
     def process_loop(self):
         """处理循环(在后台线程中运行)"""
@@ -969,6 +1036,15 @@ class IntegratedGestureGUI:
                 if frame is None:
                     time.sleep(0.01)
                     continue
+
+                # GUI鱼眼去畸（在预处理前执行）
+                if self.gui_fisheye_var and self.gui_fisheye_var.get() and self.fisheye_corrector is not None:
+                    try:
+                        corrected = self.fisheye_corrector.correct_distortion(frame)
+                        if corrected is not None:
+                            frame = corrected
+                    except Exception as _:
+                        pass
                 
                 # 图像预处理
                 if self.image_processor:
@@ -1559,7 +1635,7 @@ def start_gui_mode():
         print("  3. 尝试控制台模式")
         return False
 
-def start_console_mode(camera_id=0, width=640, height=480):
+def start_console_mode(camera_id=0, width=1920, height=1080):
     """启动控制台模式"""
     print("=" * 60)
     print("  手势识别控制系统 - 控制台模式")
@@ -1621,15 +1697,15 @@ def parse_arguments():
     parser.add_argument(
         '--width',
         type=int,
-        default=640,
-        help='图像宽度 (默认: 640)'
+        default=1920,
+        help='图像宽度 (默认: 1920)'
     )
     
     parser.add_argument(
         '--height',
         type=int,
-        default=480,
-        help='图像高度 (默认: 480)'
+        default=1080,
+        help='图像高度 (默认: 1080)'
     )
     
     parser.add_argument(

@@ -94,8 +94,8 @@ python launch/main_integrated.py --console --camera 1 --width 800 --height 600 -
 | `--gui` |  | 启动GUI模式 |  |
 | `--console` |  | 启动控制台模式 |  |
 | `--camera CAMERA` | `-c` | 摄像头ID | 0 |
-| `--width WIDTH` |  | 图像宽度 | 640 |
-| `--height HEIGHT` |  | 图像高度 | 480 |
+| `--width WIDTH` |  | 图像宽度 | 1920 |
+| `--height HEIGHT` |  | 图像高度 | 1080 |
 | `--debug` |  | 启用调试模式 | False |
 
 ## 使用指南
@@ -160,22 +160,31 @@ self.pose_detector = PoseDetector(model_complexity=0)  # 0=快速, 1=平衡, 2=�
 ### 2. 调整分辨率
 降低分辨率可以提高处理速度：
 ```bash
-python main_integrated.py --console --width 320 --height 240
+python main_integrated.py --console --width 1280 --height 720
 ```
 
+提示（Windows/USB 摄像头）：主程序启动时会优先申请 MJPG 编码，并尝试设置到 1920x1080；
+若驱动或设备不支持，会回退到摄像头能提供的实际分辨率（日志会提示实际值）。
+
+ 
 ### 3. 关闭调试信息
+
 在GUI中取消勾选"显示调试信息"，或在控制台模式按 `d` 键。
 
+ 
 ## 故障排除
 
+ 
 ### 常见问题
 
 #### 1. 摄像头无法启动
+
 - 检查摄像头是否被其他程序占用
 - 尝试使用不同的摄像头ID: `--camera 1`
 - 确认摄像头驱动正常
 
 #### 2. 模块导入错误
+
 ```bash
 # 确保在正确的目录运行
 cd d:\Musii-SnapShot\GithubRepo\Gesture-DetectionRecognition
@@ -183,28 +192,35 @@ python launch/main_integrated.py
 ```
 
 #### 3. 性能问题
+
 - 降低分辨率
 - 减少模型复杂度
 - 关闭不必要的显示模式
 
 #### 4. GUI无法启动
+
 - 确认tkinter已安装: `python -c "import tkinter"`
 - 尝试控制台模式: `--console`
 
 ### 系统需求检查
+
 运行内置的系统需求检查：
+
 ```bash
 python launch/main_integrated.py --debug
 ```
 
+ 
 ## 开发和扩展
 
 ### 添加新手势
+
 1. 修改 `gesture_recognition/gesture_recognizer.py`
 2. 在 `_execute_command` 方法中添加新的控制逻辑
 3. 更新手势说明文档
 
 ### 集成无人机控制
+
 1. 修改 `_execute_command` 方法
 2. 添加实际的无人机控制代码
 3. 测试控制指令的可靠性

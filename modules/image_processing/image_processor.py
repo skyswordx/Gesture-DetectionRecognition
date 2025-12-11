@@ -52,6 +52,11 @@ class CameraCapture:
                 return False
             
             # 设置摄像头参数
+            # 优先尝试 MJPG，Windows/USB 摄像头在高分辨率下更稳定
+            try:
+                self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+            except Exception:
+                pass
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
             self.cap.set(cv2.CAP_PROP_FPS, self.fps)
@@ -61,7 +66,14 @@ class CameraCapture:
             self.capture_thread.daemon = True
             self.capture_thread.start()
             
-            logger.info(f"摄像头启动成功: {self.width}x{self.height}@{self.fps}fps")
+            # 读取实际应用的分辨率
+            actual_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            actual_h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            if actual_w != self.width or actual_h != self.height:
+                logger.warning(
+                    f"请求分辨率 {self.width}x{self.height}，实际为 {actual_w}x{actual_h}"
+                )
+            logger.info(f"摄像头启动成功: {actual_w}x{actual_h}@{self.fps}fps")
             return True
             
         except Exception as e:
