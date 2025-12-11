@@ -1,0 +1,17 @@
+--- Fisheye Camera Calibration Results ---
+Timestamp: 20251015_163015
+Captured Frames: 19
+Valid Calibration Frames: 18
+Target Resolution: 1920x1080
+Actual Calibration Resolution: 1920x1080
+RMS (Reprojection) Error: 25474.27015013056
+Intrinsic Matrix K:
+[[568.54576855   0.         911.48685986]
+ [  0.         570.01198885 716.51083158]
+ [  0.           0.           1.        ]]
+
+Distortion Coefficients D:
+[[  0.07638729]
+ [ -3.78794519]
+ [ 11.33732713]
+ [-10.16815183]]
