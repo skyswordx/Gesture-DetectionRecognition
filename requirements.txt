@@ -6,3 +6,5 @@ matplotlib>=3.3.0
 Pillow>=8.0.0
 dataclasses>=0.6; python_version < "3.7"
 typing-extensions>=3.7.4; python_version < "3.8"
+hypothesis>=6.0.0
+scikit-image>=0.18.0

@@ -53,10 +53,9 @@ class GestureClassifier:
 
 class TakeoffGestureClassifier(GestureClassifier):
     """起飞手势分类器 - 双手高举过头"""
-    
     def __init__(self):
         super().__init__("takeoff")
-        self.confidence_threshold = 0.8
+        self.confidence_threshold = 0.7
     
     def classify(self, landmarks, frame_info: Dict = None) -> Tuple[float, Dict]:
         """识别起飞手势"""
@@ -69,50 +68,78 @@ class TakeoffGestureClassifier(GestureClassifier):
             right_wrist = landmarks[16]
             left_shoulder = landmarks[11]
             right_shoulder = landmarks[12]
+            left_elbow = landmarks[13]
+            right_elbow = landmarks[14]
             nose = landmarks[0]
             
-            # 检查关键点可见性
+            # 检查关键点可见性 (降低阈值以适应更多场景)
             required_points = [left_wrist, right_wrist, left_shoulder, right_shoulder, nose]
-            if any(point.visibility < 0.5 for point in required_points):
+            if any(point.visibility < 0.05 for point in required_points):
                 return 0.0, {"reason": "关键点不可见"}
             
             details = {}
             confidence = 0.0
             
-            # 1. 检查双手是否高于头部
+            # 1. 核心条件：双手必须高于头部（鼻子）
             hands_above_head = (left_wrist.y < nose.y and right_wrist.y < nose.y)
             details['hands_above_head'] = hands_above_head
             
             if not hands_above_head:
                 return 0.0, details
             
-            # 2. 检查双手高度对称性
+            # 2. 双手必须高于肩膀
+            hands_above_shoulder = (left_wrist.y < left_shoulder.y and right_wrist.y < right_shoulder.y)
+            details['hands_above_shoulder'] = hands_above_shoulder
+            
+            if not hands_above_shoulder:
+                return 0.0, details
+            
+            # 3. 检查双手高度对称性
             hand_symmetry = abs(left_wrist.y - right_wrist.y)
             details['hand_symmetry'] = hand_symmetry
-            symmetry_score = max(0, 1 - hand_symmetry / 0.1)  # 对称性得分
+            symmetry_score = max(0, 1 - hand_symmetry / 0.15)
             
-            # 3. 检查双手是否足够高于肩膀
+            # 4. 检查双手高于肩膀的程度
             left_height = left_shoulder.y - left_wrist.y
             right_height = right_shoulder.y - right_wrist.y
             details['left_arm_height'] = left_height
             details['right_arm_height'] = right_height
             
-            min_height = 0.15  # 最小高度阈值
-            height_score = min(1.0, (left_height + right_height) / (2 * min_height))
+            # 降低最小高度阈值，只要高于肩膀即可
+            min_height = 0.05
+            height_score = min(1.0, (left_height + right_height) / (2 * 0.15))
             
-            # 4. 检查手臂张开程度
+            # 5. 检查手臂是否向上（手腕高于肘部）
+            left_arm_up = left_wrist.y < left_elbow.y
+            right_arm_up = right_wrist.y < right_elbow.y
+            details['arms_pointing_up'] = left_arm_up and right_arm_up
+            
+            # 6. 手臂张开程度（可选，不作为硬性条件）
             hand_spread = abs(left_wrist.x - right_wrist.x)
             details['hand_spread'] = hand_spread
-            spread_score = min(1.0, hand_spread / 0.4)  # 期望至少0.4的归一化距离
+            # 张开或靠近都可以，但张开会有额外加分
+            spread_bonus = min(0.2, hand_spread / 2.0)
             
-            # 5. 综合计算置信度
+            # 7. 综合计算置信度
+            # 核心：双手高于头部且高于肩膀
             if left_height > min_height and right_height > min_height:
-                confidence = (symmetry_score * 0.3 + height_score * 0.4 + 
-                            spread_score * 0.3)
+                # 基础分：满足核心条件
+                confidence = 0.6
                 
-                # 额外奖励：完美对称和足够高度
-                if hand_symmetry < 0.05 and min(left_height, right_height) > 0.2:
-                    confidence = min(1.0, confidence * 1.2)
+                # 对称性加分
+                confidence += symmetry_score * 0.2
+                
+                # 高度加分
+                confidence += height_score * 0.15
+                
+                # 手臂向上加分
+                if left_arm_up and right_arm_up:
+                    confidence += 0.1
+                
+                # 张开加分
+                confidence += spread_bonus
+                
+                confidence = min(1.0, confidence)
             
             details['final_confidence'] = confidence
             return confidence, details
@@ -122,14 +149,14 @@ class TakeoffGestureClassifier(GestureClassifier):
             return 0.0, {"error": str(e)}
 
 class LandingGestureClassifier(GestureClassifier):
-    """降落手势分类器 - 双手向下压"""
+    """降落手势分类器 - 双手下垂/向下"""
     
     def __init__(self):
         super().__init__("landing")
-        self.confidence_threshold = 0.8
+        self.confidence_threshold = 0.7
     
     def classify(self, landmarks, frame_info: Dict = None) -> Tuple[float, Dict]:
-        """识别降落手势"""
+        """识别降落手势 - 双手自然下垂或向下压"""
         if not landmarks or len(landmarks) < 33:
             return 0.0, {}
         
@@ -140,49 +167,95 @@ class LandingGestureClassifier(GestureClassifier):
             right_shoulder = landmarks[12]
             left_hip = landmarks[23]
             right_hip = landmarks[24]
+            left_elbow = landmarks[13]
+            right_elbow = landmarks[14]
+            nose = landmarks[0]
             
             required_points = [left_wrist, right_wrist, left_shoulder, right_shoulder, left_hip, right_hip]
-            if any(point.visibility < 0.5 for point in required_points):
+            if any(point.visibility < 0.05 for point in required_points):
                 return 0.0, {"reason": "关键点不可见"}
             
             details = {}
-            
-            # 1. 检查双手是否低于腰部
             hip_y = (left_hip.y + right_hip.y) / 2
-            hands_below_waist = (left_wrist.y > hip_y and right_wrist.y > hip_y)
-            details['hands_below_waist'] = hands_below_waist
+            shoulder_y = (left_shoulder.y + right_shoulder.y) / 2
             
-            if not hands_below_waist:
+            # 1. 核心条件：双手必须低于肩膀
+            hands_below_shoulder = (left_wrist.y > left_shoulder.y and right_wrist.y > right_shoulder.y)
+            details['hands_below_shoulder'] = hands_below_shoulder
+            
+            if not hands_below_shoulder:
                 return 0.0, details
             
-            # 2. 检查双手水平程度
-            hand_level_diff = abs(left_wrist.y - right_wrist.y)
-            details['hand_level_diff'] = hand_level_diff
-            level_score = max(0, 1 - hand_level_diff / 0.08)
+            # 2. 双手不能高于鼻子（排除起飞手势）
+            hands_below_head = (left_wrist.y > nose.y and right_wrist.y > nose.y)
+            details['hands_below_head'] = hands_below_head
             
-            # 3. 检查手臂向下伸直程度
-            left_elbow = landmarks[13]
-            right_elbow = landmarks[14]
+            if not hands_below_head:
+                return 0.0, details
             
-            # 手腕应该低于肘部
+            # 3. 检查手臂是否向下（手腕低于肘部）- 作为加分项而非必要条件
             left_arm_down = left_wrist.y > left_elbow.y
             right_arm_down = right_wrist.y > right_elbow.y
-            details['arms_pointing_down'] = left_arm_down and right_arm_down
+            details['left_arm_down'] = left_arm_down
+            details['right_arm_down'] = right_arm_down
             
-            # 4. 检查手势强度 (越低越好)
-            depth_below_waist = min(left_wrist.y - hip_y, right_wrist.y - hip_y)
-            details['depth_below_waist'] = depth_below_waist
-            depth_score = min(1.0, depth_below_waist / 0.15)
+            # 4. 检查双手是否在腰部附近或以下
+            hands_near_or_below_waist = (left_wrist.y > hip_y - 0.08 and right_wrist.y > hip_y - 0.08)
+            details['hands_near_waist'] = hands_near_or_below_waist
             
-            # 5. 计算置信度
+            # 5. 检查双手水平程度（对称性）
+            hand_level_diff = abs(left_wrist.y - right_wrist.y)
+            details['hand_level_diff'] = hand_level_diff
+            level_score = max(0, 1 - hand_level_diff / 0.15)
+            
+            # 6. 检查双手张开程度（下垂时双手应该分开，与stop区分）
+            hand_spread = abs(left_wrist.x - right_wrist.x)
+            details['hand_spread'] = hand_spread
+            
+            # 7. 计算手腕低于肩膀的程度
+            left_drop = left_wrist.y - left_shoulder.y
+            right_drop = right_wrist.y - right_shoulder.y
+            details['left_drop'] = left_drop
+            details['right_drop'] = right_drop
+            drop_score = min(1.0, (left_drop + right_drop) / 0.15)
+            
+            # 8. 排除stop手势：如果双手非常靠近且真正在胸前（肩膀和腰部中间），不是landing
+            center_x = (left_shoulder.x + right_shoulder.x) / 2
+            hands_very_close = hand_spread < 0.06  # 更严格的距离阈值
+            chest_y = (shoulder_y + hip_y) / 2  # 胸部位置在肩膀和腰部中间
+            hands_at_chest = (left_wrist.y < hip_y - 0.05 and right_wrist.y < hip_y - 0.05 and
+                             left_wrist.y > shoulder_y + 0.02 and right_wrist.y > shoulder_y + 0.02)
+            if hands_very_close and hands_at_chest:
+                details['rejected'] = 'looks_like_stop'
+                return 0.0, details
+            
+            # 9. 综合计算置信度
             confidence = 0.0
-            if hands_below_waist and left_arm_down and right_arm_down:
-                confidence = level_score * 0.4 + depth_score * 0.6
-                
-                # 额外奖励：手掌朝下姿势 (通过手腕低于肘部判断)
-                if (left_wrist.y > left_elbow.y + 0.05 and 
-                    right_wrist.y > right_elbow.y + 0.05):
-                    confidence = min(1.0, confidence * 1.2)
+            
+            # 基础分：满足核心条件（双手低于肩膀和头部）
+            confidence = 0.5
+            
+            # 手臂向下加分
+            if left_arm_down and right_arm_down:
+                confidence += 0.2
+            elif left_arm_down or right_arm_down:
+                confidence += 0.1
+            
+            # 对称性加分
+            confidence += level_score * 0.1
+            
+            # 下垂程度加分
+            confidence += drop_score * 0.15
+            
+            # 在腰部附近或以下加分
+            if hands_near_or_below_waist:
+                confidence += 0.1
+            
+            # 双手分开加分（自然下垂姿势，与stop区分）
+            if hand_spread > 0.03:
+                confidence += 0.05
+            
+            confidence = min(1.0, confidence)
             
             details['final_confidence'] = confidence
             return confidence, details
@@ -231,13 +304,13 @@ class DirectionGestureClassifier(GestureClassifier):
             left_shoulder = landmarks[11]
             nose = landmarks[0]
             
-            if any(p.visibility < 0.5 for p in [right_wrist, right_shoulder, left_wrist, left_shoulder, nose]):
+            if any(p.visibility < 0.7 for p in [right_wrist, right_shoulder, left_wrist, left_shoulder, nose]):
                 return 0.0, {"reason": "关键点不可见"}
             
             details = {}
             
-            # 右手前伸 (z坐标小于鼻子)
-            hand_forward = right_wrist.z < nose.z - 0.05
+            # 右手前伸 (z坐标小于鼻子) - 提高阈值要求
+            hand_forward = right_wrist.z < nose.z - 0.15
             details['hand_forward'] = hand_forward
             
             if not hand_forward:
@@ -274,13 +347,13 @@ class DirectionGestureClassifier(GestureClassifier):
             right_wrist = landmarks[16]
             right_shoulder = landmarks[12]
             
-            if any(p.visibility < 0.5 for p in [left_wrist, left_shoulder, right_wrist, right_shoulder]):
+            if any(p.visibility < 0.7 for p in [left_wrist, left_shoulder, right_wrist, right_shoulder]):
                 return 0.0, {"reason": "关键点不可见"}
             
             details = {}
             
-            # 左手向左伸展
-            hand_extended = left_wrist.x < left_shoulder.x - 0.15
+            # 左手向左伸展 - 提高阈值要求
+            hand_extended = left_wrist.x < left_shoulder.x - 0.25
             details['hand_extended'] = hand_extended
             
             if not hand_extended:
@@ -317,13 +390,13 @@ class DirectionGestureClassifier(GestureClassifier):
             left_wrist = landmarks[15]
             left_shoulder = landmarks[11]
             
-            if any(p.visibility < 0.5 for p in [right_wrist, right_shoulder, left_wrist, left_shoulder]):
+            if any(p.visibility < 0.7 for p in [right_wrist, right_shoulder, left_wrist, left_shoulder]):
                 return 0.0, {"reason": "关键点不可见"}
             
             details = {}
             
-            # 右手向右伸展
-            hand_extended = right_wrist.x > right_shoulder.x + 0.15
+            # 右手向右伸展 - 提高阈值要求
+            hand_extended = right_wrist.x > right_shoulder.x + 0.25
             details['hand_extended'] = hand_extended
             
             if not hand_extended:
@@ -353,102 +426,24 @@ class DirectionGestureClassifier(GestureClassifier):
             return 0.0, {"error": str(e)}
     
     def _detect_up(self, landmarks) -> Tuple[float, Dict]:
-        """检测上升手势 - 双手向上推"""
-        try:
-            left_wrist = landmarks[15]
-            right_wrist = landmarks[16]
-            left_shoulder = landmarks[11]
-            right_shoulder = landmarks[12]
-            
-            if any(p.visibility < 0.5 for p in [left_wrist, right_wrist, left_shoulder, right_shoulder]):
-                return 0.0, {"reason": "关键点不可见"}
-            
-            details = {}
-            
-            # 双手都高于肩膀
-            both_hands_up = (left_wrist.y < left_shoulder.y - 0.05 and 
-                            right_wrist.y < right_shoulder.y - 0.05)
-            details['both_hands_up'] = both_hands_up
-            
-            if not both_hands_up:
-                return 0.0, details
-            
-            # 双手分开 (推举姿势)
-            hands_separated = abs(left_wrist.x - right_wrist.x) > 0.2
-            details['hands_separated'] = hands_separated
-            
-            # 双手高度相近
-            hands_level = abs(left_wrist.y - right_wrist.y) < 0.1
-            details['hands_level'] = hands_level
-            
-            # 计算置信度
-            confidence = 0.0
-            if both_hands_up:
-                confidence = 0.5
-                if hands_separated:
-                    confidence += 0.3
-                if hands_level:
-                    confidence += 0.2
-            
-            details['confidence'] = confidence
-            return confidence, details
-            
-        except Exception as e:
-            return 0.0, {"error": str(e)}
+        """检测上升手势 - 双手向上推 (与takeoff区分，需要更严格条件)"""
+        # 由于与takeoff手势重叠，禁用此手势
+        return 0.0, {"reason": "disabled - use takeoff instead"}
     
     def _detect_down(self, landmarks) -> Tuple[float, Dict]:
-        """检测下降手势 - 双手向下压"""
-        try:
-            left_wrist = landmarks[15]
-            right_wrist = landmarks[16]
-            left_shoulder = landmarks[11]
-            right_shoulder = landmarks[12]
-            
-            if any(p.visibility < 0.5 for p in [left_wrist, right_wrist, left_shoulder, right_shoulder]):
-                return 0.0, {"reason": "关键点不可见"}
-            
-            details = {}
-            
-            # 双手都低于肩膀
-            both_hands_down = (left_wrist.y > left_shoulder.y + 0.05 and 
-                              right_wrist.y > right_shoulder.y + 0.05)
-            details['both_hands_down'] = both_hands_down
-            
-            if not both_hands_down:
-                return 0.0, details
-            
-            # 双手分开
-            hands_separated = abs(left_wrist.x - right_wrist.x) > 0.2
-            details['hands_separated'] = hands_separated
-            
-            # 双手高度相近
-            hands_level = abs(left_wrist.y - right_wrist.y) < 0.1
-            details['hands_level'] = hands_level
-            
-            # 计算置信度
-            confidence = 0.0
-            if both_hands_down:
-                confidence = 0.5
-                if hands_separated:
-                    confidence += 0.3
-                if hands_level:
-                    confidence += 0.2
-            
-            details['confidence'] = confidence
-            return confidence, details
-            
-        except Exception as e:
-            return 0.0, {"error": str(e)}
+        """检测下降手势 - 双手向下压 (与landing区分，需要更严格条件)"""
+        # 由于与landing手势重叠，禁用此手势
+        return 0.0, {"reason": "disabled - use landing instead"}
 
 class StopGestureClassifier(GestureClassifier):
-    """停止手势分类器 - 双手胸前交叉或举起"""
+    """停止手势分类器 - 双手胸前交叉（抱胸）"""
     
     def __init__(self):
         super().__init__("stop")
-        self.confidence_threshold = 0.7
+        self.confidence_threshold = 0.75
     
     def classify(self, landmarks, frame_info: Dict = None) -> Tuple[float, Dict]:
-        """识别停止手势"""
+        """识别停止手势 - 双手抱胸/交叉"""
         if not landmarks or len(landmarks) < 33:
             return 0.0, {}
         
@@ -457,41 +452,80 @@ class StopGestureClassifier(GestureClassifier):
             right_wrist = landmarks[16]
             left_shoulder = landmarks[11]
             right_shoulder = landmarks[12]
+            left_elbow = landmarks[13]
+            right_elbow = landmarks[14]
+            left_hip = landmarks[23]
+            right_hip = landmarks[24]
+            nose = landmarks[0]
             
-            if any(p.visibility < 0.5 for p in [left_wrist, right_wrist, left_shoulder, right_shoulder]):
+            if any(p.visibility < 0.05 for p in [left_wrist, right_wrist, left_shoulder, right_shoulder]):
                 return 0.0, {"reason": "关键点不可见"}
             
             details = {}
-            
-            # 双手在胸前高度
             shoulder_y = (left_shoulder.y + right_shoulder.y) / 2
-            chest_level = (abs(left_wrist.y - shoulder_y) < 0.15 and 
-                          abs(right_wrist.y - shoulder_y) < 0.15)
-            details['chest_level'] = chest_level
+            hip_y = (left_hip.y + right_hip.y) / 2
+            center_x = (left_shoulder.x + right_shoulder.x) / 2
             
-            if not chest_level:
+            # 1. 排除条件：双手高于头部（这是起飞手势）
+            hands_above_head = (left_wrist.y < nose.y and right_wrist.y < nose.y)
+            if hands_above_head:
+                details['rejected'] = 'hands_above_head'
                 return 0.0, details
             
-            # 双手靠近身体中心
-            center_x = (left_shoulder.x + right_shoulder.x) / 2
-            hands_centered = (abs(left_wrist.x - center_x) < 0.25 and 
-                             abs(right_wrist.x - center_x) < 0.25)
+            # 2. 排除条件：双手在腰部以下且手臂向下（这是降落手势）
+            hands_near_waist = (left_wrist.y > hip_y - 0.05 and right_wrist.y > hip_y - 0.05)
+            left_arm_down = left_wrist.y > left_elbow.y
+            right_arm_down = right_wrist.y > right_elbow.y
+            if hands_near_waist and left_arm_down and right_arm_down:
+                details['rejected'] = 'landing_gesture'
+                return 0.0, details
+            
+            # 3. 核心条件：双手必须在胸前高度（肩膀和腰部之间，更严格）
+            # 收紧范围：手腕y坐标在肩膀y±0.08范围内
+            strict_chest_level = (abs(left_wrist.y - shoulder_y) < 0.08 and 
+                                  abs(right_wrist.y - shoulder_y) < 0.08)
+            details['strict_chest_level'] = strict_chest_level
+            
+            # 4. 核心条件：双手必须非常靠近（交叉或抱胸）
+            hand_distance = abs(left_wrist.x - right_wrist.x)
+            details['hand_distance'] = hand_distance
+            hands_very_close = hand_distance < 0.08  # 更严格的距离阈值
+            details['hands_very_close'] = hands_very_close
+            
+            # 5. 双手靠近身体中心
+            hands_centered = (abs(left_wrist.x - center_x) < 0.15 and 
+                             abs(right_wrist.x - center_x) < 0.15)
             details['hands_centered'] = hands_centered
             
-            # 双手距离较近 (交叉或并拢)
-            hands_close = abs(left_wrist.x - right_wrist.x) < 0.15
-            details['hands_close'] = hands_close
+            # 6. 检查手臂是否弯曲（抱胸时手臂应该弯曲）
+            # 手腕应该在肘部附近或略高于肘部
+            left_arm_bent = abs(left_wrist.y - left_elbow.y) < 0.1
+            right_arm_bent = abs(right_wrist.y - right_elbow.y) < 0.1
+            details['arms_bent'] = left_arm_bent and right_arm_bent
             
-            # 计算置信度
+            # 7. 计算置信度
             confidence = 0.0
-            if chest_level:
-                confidence = 0.4
-                if hands_centered:
-                    confidence += 0.3
-                if hands_close:
-                    confidence += 0.3
             
-            details['confidence'] = confidence
+            # 必须满足：双手靠近中心 + 双手非常靠近
+            if hands_centered and hands_very_close:
+                confidence = 0.7
+                
+                # 严格胸前高度加分
+                if strict_chest_level:
+                    confidence += 0.2
+                
+                # 手臂弯曲加分
+                if left_arm_bent and right_arm_bent:
+                    confidence += 0.1
+                
+                confidence = min(1.0, confidence)
+            elif hands_centered and hand_distance < 0.12:
+                # 宽松条件：双手较近但不是非常近
+                confidence = 0.5
+                if strict_chest_level:
+                    confidence += 0.15
+            
+            details['final_confidence'] = confidence
             return confidence, details
             
         except Exception as e:

@@ -1,0 +1,4 @@
+# file: E:\Project\Gesture-DetectionRecognition\modules\pose_detection\pose_detector.py
+# hypothesis_version: 6.148.7
+
+[-1.0, 0.0, 1e-06, 0.01, 0.5, 0.6, 1.0, 100, 120, 255, 1000, '\n=== 位置信息 ===', '\n=== 检测统计 ===', '\n=== 角度信息 ===', '..', 'Pose Detection Test', '__main__', 'a', 'body_lean', 'fps_estimate', 'head_x', 'head_y', 'hip_center_x', 'hip_center_y', 'hip_width', 'left_arm', 'left_leg', 'q', 'right_arm', 'right_leg', 's', 'shoulder_center_x', 'shoulder_center_y', 'shoulder_width', 'success_rate', 'total_detections', '姿势检测器初始化完成', '摄像头启动失败', '测试姿势检测...']

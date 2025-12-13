@@ -1,0 +1,4 @@
+# file: E:\Project\Gesture-DetectionRecognition\modules\fisheye_validation\calibration_loader.py
+# hypothesis_version: 6.148.7
+
+[0.0, 1e-09, 1e-06, 2.0, 10.0, 1080, 1920, '=', 'Camera Matrix (K):', 'camera_matrix', 'dist_coeffs', 'image_height', 'image_width', 'original_alpha', 'r', 'utf-8', 'was_converted']

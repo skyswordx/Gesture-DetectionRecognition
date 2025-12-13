@@ -84,7 +84,7 @@ class ImageSetCapture:
             return False
         self.current_index = 0
         self.last_frame_time = time.time()
-        print(f"✅ 开始处理图片集: {self.folder_path}，总计 {self.num_frames} 张图片。")
+        print(f"[OK] 开始处理图片集: {self.folder_path}，总计 {self.num_frames} 张图片。")
         return True
 
     def get_frame(self) -> Optional[np.ndarray]:
@@ -104,12 +104,17 @@ class ImageSetCapture:
 
         # 读取图片
         image_path = self.image_files[self.current_index]
-        print(f"🖼️ 正在处理 [{self.current_index + 1}/{self.num_frames}]: {os.path.basename(image_path)}")
+        print(f"[IMG] 正在处理 [{self.current_index + 1}/{self.num_frames}]: {os.path.basename(image_path)}")
         frame = cv2.imread(image_path)
         
-        # 【重要】：如果图片大小不一致，resize到目标尺寸
-        if frame is not None and (frame.shape[1] != self.width or frame.shape[0] != self.height):
-            frame = cv2.resize(frame, (self.width, self.height))
+        # 【修改】：保持宽高比，只限制最大尺寸
+        if frame is not None:
+            h, w = frame.shape[:2]
+            max_dim = max(self.width, self.height)
+            if max(h, w) > max_dim:
+                scale = max_dim / max(h, w)
+                new_w, new_h = int(w * scale), int(h * scale)
+                frame = cv2.resize(frame, (new_w, new_h))
 
         # 增加索引
         self.current_index += 1
@@ -164,7 +169,7 @@ class GestureControlSystem:
             
         except Exception as e:
             logger.error(f"组件初始化失败: {e}")
-            print(f"❌ 组件初始化失败: {e}")
+            print(f"[ERROR] 组件初始化失败: {e}")
             print("请确保所有依赖包已安装")
             raise
             
@@ -185,22 +190,22 @@ class GestureControlSystem:
     def _print_supported_gestures(self):
         """打印支持的手势 (从原始代码复制过来)"""
         print("支持的手势:")
-        print("  🙌 起飞: 双手高举过头")
-        print("  👇 降落: 双手向下压")
-        print("  👉 前进: 右手前推")
-        print("  👈 左移: 左手指向左侧")
-        print("  👉 右移: 右手指向右侧")
-        print("  ☝️ 上升: 双手向上推举")
-        print("  👇 下降: 双手向下压")
-        print("  ✋ 停止: 双手胸前交叉")
+        print("  [TAKEOFF] 起飞: 双手高举过头")
+        print("  [LANDING] 降落: 双手向下压")
+        print("  [FORWARD] 前进: 右手前推")
+        print("  [LEFT]    左移: 左手指向左侧")
+        print("  [RIGHT]   右移: 右手指向右侧")
+        print("  [UP]      上升: 双手向上推举")
+        print("  [DOWN]    下降: 双手向下压")
+        print("  [STOP]    停止: 双手胸前交叉")
     
     # =======================================================
     # 【核心修改区：修复 'GestureResult' object has no attribute 'get'】
     # =======================================================
-    def _process_control_command(self, gesture_result: Any, distance_result: Dict[str, Any]):
+    def _process_control_command(self, gesture_result: Any, distance_result: Any):
         """
         处理手势识别结果，确定控制指令
-        【修复：使用 getattr 兼容 GestureResult 对象】
+        【修复：使用 getattr 兼容 GestureResult 和 DistanceResult 对象】
         """
         current_time = time.time()
         
@@ -209,7 +214,8 @@ class GestureControlSystem:
         
         if command_name is None:
             # 2. 如果不是对象或没有 'gesture' 属性，则尝试从字典中获取 'command' 键 (兼容旧接口)
-            command_name = gesture_result.get('command', None) 
+            if hasattr(gesture_result, 'get'):
+                command_name = gesture_result.get('command', None)
         
         # 检查是否识别到了有效手势
         if command_name and command_name != "none":
@@ -221,12 +227,17 @@ class GestureControlSystem:
 
         # 距离和姿势相关指令 (如果需要)
         # 示例：如果距离太近，强制停止
-        if distance_result.get('distance_cm', 999) < 50:
-             if current_time - self.last_command_time > 2: # 避免频繁触发
-                 self.current_command = "forced_stop (too close)"
-                 self.last_command_time = current_time
-                 self._execute_command(self.current_command)
-                 return
+        # 【修复：使用 getattr 兼容 DistanceResult 对象】
+        distance_value = getattr(distance_result, 'distance', None)
+        if distance_value is None and hasattr(distance_result, 'get'):
+            distance_value = distance_result.get('distance_cm', 999) / 100.0  # 转换为米
+        
+        if distance_value is not None and distance_value < 0.5:  # 0.5米
+            if current_time - self.last_command_time > 2: # 避免频繁触发
+                self.current_command = "forced_stop (too close)"
+                self.last_command_time = current_time
+                self._execute_command(self.current_command)
+                return
 
         # 如果长时间没有新的有效指令，命令恢复为 none
         if current_time - self.last_command_time > 1.0: # 1秒不执行任何指令
@@ -235,28 +246,28 @@ class GestureControlSystem:
     def _create_visualization(self, processed_frame, pose_result, distance_result, gesture_result, quality):
         """综合所有模块的可视化结果"""
         
-        # 1. 绘制姿势和骨骼
-        output_frame = self.pose_visualizer.draw_landmarks(
+        # 1. 绘制姿势和骨骼 (使用 draw_pose 方法)
+        output_frame = self.pose_visualizer.draw_pose(
             processed_frame, 
-            pose_result.landmarks, 
-            pose_result.connections
+            pose_result,
+            draw_landmarks=True,
+            draw_bbox=True,
+            draw_info=True
         )
         
         # 2. 绘制距离信息
         output_frame = self.distance_visualizer.draw_distance_info(
             output_frame, 
             distance_result, 
-            (pose_result.frame_width, pose_result.frame_height)
+            pose_result.landmarks,
+            pose_result.bbox
         )
         
-        # 3. 绘制手势信息
-        # 针对 gesture_result 对象进行处理，确保 draw_gesture 接收到正确的数据结构
-        # 假设 GestureVisualizer 可以接收 GestureResult 对象，如果不能，需要在这里添加 to_dict() 转换
-        # 由于您说之前没有问题，这里保持调用不变，依赖 Visualizer 模块的兼容性
-        output_frame = self.gesture_visualizer.draw_gesture(
+        # 3. 绘制手势信息 (使用 draw_gesture_info 方法)
+        output_frame = self.gesture_visualizer.draw_gesture_info(
             output_frame, 
             gesture_result, 
-            self.current_command
+            pose_result.landmarks
         )
         
         # 4. 绘制FPS和系统信息
@@ -323,11 +334,11 @@ class GestureControlSystem:
         print("启动图片集读取...")
         # 【修改点 3】：调用 ImageSetCapture 的 start
         if not self.camera_capture.start():
-            print("❌ 图片集启动失败，请检查路径和文件。")
+            print("[ERROR] 图片集启动失败，请检查路径和文件。")
             return False
         
         self.is_running = True
-        print("✅ 系统启动成功")
+        print("[OK] 系统启动成功")
         return True
 
     def stop(self):
@@ -360,20 +371,19 @@ class GestureControlSystem:
                 
                 # 【修改点 5】：如果 output_frame 为 None，表示图片集已处理完毕
                 if output_frame is None:
-                    print("\n🎉 所有图片已处理完毕，系统退出。")
+                    print("\n[DONE] 所有图片已处理完毕，系统退出。")
                     break
                 
                 self.frame_count += 1
                 
                 # 显示结果
-                # 在图片集模式下，我们使用 waitKey(0) 来实现按任意键继续
-                key = self.image_visualizer.show_image(output_frame, "Gesture Control System")
+                # 在图片集模式下，使用 waitKey(0) 来实现按任意键继续
+                key = self.image_visualizer.show_image(output_frame, "Gesture Control System", wait_key=0)
                 
                 # 处理按键
                 if key == ord('q') or key == 27: # q 或 ESC 退出
                     break
-                elif key != -1: # 任何其他键都继续，因为 waitKey(0) 默认等待
-                    pass 
+                # 任何其他键都继续处理下一张图片 
                 
         except KeyboardInterrupt:
             print("\n程序被用户中断")
@@ -392,10 +402,13 @@ class GestureControlSystem:
             if frame is None:
                 return None
             
-            # ... (以下逻辑与摄像头模式保持一致) ...
+            # 【图片集模式关键修改】：每张图片独立识别，重置手势识别器状态
+            # 避免时序一致性检查导致的误识别
+            self.gesture_recognizer.reset_statistics()
             
-            # 2. 图像预处理
-            processed_frame = self.image_processor.preprocess(frame)
+            # 2. 图像预处理 (图片集模式下不做镜像翻转，直接使用原图)
+            # 注意：preprocess 会做镜像翻转，对于图片集模式不适用
+            processed_frame = frame.copy()
             
             # 3. 图像质量评估
             quality = self.quality_assessor.assess_quality(processed_frame)

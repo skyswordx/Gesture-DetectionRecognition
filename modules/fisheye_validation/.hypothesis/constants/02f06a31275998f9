@@ -1,0 +1,4 @@
+# file: E:\Project\Gesture-DetectionRecognition\modules\image_processing\__init__.py
+# hypothesis_version: 6.148.7
+
+['CameraCapture', 'ImageProcessor', 'ImageVisualizer']

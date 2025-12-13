@@ -1,0 +1,4 @@
+# file: E:\Project\Gesture-DetectionRecognition\modules\__init__.py
+# hypothesis_version: 6.148.7
+
+['1.0.0', 'distance_estimation', 'fisheye_validation', 'gesture_recognition', 'image_processing', 'pose_detection', 'team@example.com']
